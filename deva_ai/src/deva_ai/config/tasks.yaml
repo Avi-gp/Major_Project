@@ -1,0 +1,7 @@
+IngestionTask:
+  description: >
+    Process the dataset file using its absolute path{file_path} and provide basic analysis 
+    including dataset shape, data preview, and numeric column statistics.
+  expected_output: >
+    A dictionary containing the dataset shape, preview of the first few rows,
+    and statistics for numeric columns if present.
