@@ -1,7 +1,24 @@
 IngestionTask:
   description: >
-    Process the dataset file using its absolute path{file_path} and provide basic analysis 
-    including dataset shape, data preview, and numeric column statistics.
+    Process the dataset located at file path {file_path} with filename {file_name}.
+    Read the file, analyze its content, and provide insights about the dataset.
   expected_output: >
     A dictionary containing the dataset shape, preview of the first few rows,
-    and statistics for numeric columns if present.
+    and information about column types. Return the results in a valid JSON format.
+
+PreprocessingTask:
+  description: >
+    Clean and preprocess the dataset located at file path {file_path} with filename {file_name}.
+    Apply comprehensive data cleaning techniques including:
+    1. Data Type Conversion for numeric columns stored as objects
+    2. Handle Missing Values using appropriate imputation strategies
+    3. Detect and Remove Duplicate Records
+    4. Identify and Drop Irrelevant Columns
+    5. Clean Special Characters in Categorical Columns
+    6. Advanced Type Inference for Datetime Columns
+    7. Outlier Detection and Treatment using IQR method
+    8. Handle Outliers by Clipping to appropriate bounds
+  expected_output: >
+    A dictionary containing preprocessing statistics and information about the
+    transformations applied to the dataset. Return the results in a valid JSON format
+    and save the preprocessed dataset to a new file with the preprocessing steps applied.

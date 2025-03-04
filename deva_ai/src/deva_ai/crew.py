@@ -1,6 +1,7 @@
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
-from tools.file_upload_tool import FileUploadTool
+from tools.file_handling_tool import FileHandlingTool
+from tools.data_preprocessing_tool import DataPreprocessingTool
 from dotenv import load_dotenv
 import os
 import yaml
@@ -18,8 +19,9 @@ LLM_model = LLM(
     temperature=0.5,
 )
 
-# Initialize custom tool
-file_upload_tool = FileUploadTool()
+# Initialize custom tools
+file_handling_tool = FileHandlingTool()
+data_preprocessing_tool = DataPreprocessingTool()
 
 
 @CrewBase
@@ -34,7 +36,16 @@ class DevaAi:
     def data_ingestion_agent(self) -> Agent:
         return Agent(
             config=self.agents_config['DataIngestionAgent'],  
-            tools=[file_upload_tool],
+            tools=[file_handling_tool],
+            verbose=True,
+            llm=LLM_model
+        )
+    
+    @agent
+    def data_preprocessing_agent(self) -> Agent:
+        return Agent(
+            config=self.agents_config['DataPreprocessingAgent'],
+            tools=[data_preprocessing_tool],
             verbose=True,
             llm=LLM_model
         )
@@ -44,7 +55,16 @@ class DevaAi:
         return Task(
             config=self.tasks_config['IngestionTask'],  
             agent=self.data_ingestion_agent(),
-			tools=[file_upload_tool],  
+            tools=[file_handling_tool],  
+            verbose=True
+        )
+    
+    @task
+    def data_preprocessing_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['PreprocessingTask'],
+            agent=self.data_preprocessing_agent(),
+            tools=[data_preprocessing_tool],
             verbose=True
         )
 
