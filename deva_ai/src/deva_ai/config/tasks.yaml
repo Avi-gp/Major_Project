@@ -3,8 +3,10 @@ IngestionTask:
     Process the dataset located at file path {file_path} with filename {file_name}.
     Read the file, analyze its content, and provide insights about the dataset.
   expected_output: >
-    A dictionary containing the dataset shape, preview of the first few rows,
-    and information about column types. Return the results in a valid JSON format.
+    A dictionary containing the dataset information. Return the results in a valid JSON format with the following required keys:
+    - "dataset_shape": [rows, columns] - The shape of the dataset as a list of two integers
+    - "preview": [...] - A list containing dictionaries representing the first few rows
+    - "dtypes": {...} - A dictionary mapping column names to their data types
 
 PreprocessingTask:
   description: >
@@ -19,6 +21,17 @@ PreprocessingTask:
     7. Outlier Detection and Treatment using IQR method
     8. Handle Outliers by Clipping to appropriate bounds
   expected_output: >
-    A dictionary containing preprocessing statistics and information about the
-    transformations applied to the dataset. Return the results in a valid JSON format
-    and save the preprocessed dataset to a new file with the preprocessing steps applied.
+    A dictionary containing preprocessing statistics and information. Return the results in a valid JSON format with the following required keys:
+    - "original_shape": [rows, columns] - Original dataset shape
+    - "final_shape": [rows, columns] - Final dataset shape after preprocessing
+    - "original_missing_values": int - Count of missing values before preprocessing
+    - "missing_values_handled": int - Count of missing values that were handled
+    - "duplicates_removed": int - Count of duplicate rows removed
+    - "outliers_handled": int - Count of outliers that were handled
+    - "columns_dropped": [{"column": "column_name", "reason": "reason for dropping"}] - List of dictionaries containing column names and reasons they were dropped
+    - "transformations_applied": [...] - List of transformations that were applied
+    - "column_type_changes": {...} - Dictionary with column names as keys and nested dictionaries containing "original" and "new" types
+    - "columns_dtypes": {...} - Dictionary mapping column names to their final data types
+    - "dataset_preview": [...] - List of dictionaries representing the first few rows of the preprocessed dataset
+    - "preprocessed_file_path": string - Path to the saved preprocessed file
+    Save the preprocessed dataset to a new file with the preprocessing steps applied.

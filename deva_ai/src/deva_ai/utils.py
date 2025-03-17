@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import os
 import re
+import streamlit as st
 
 def save_uploadedfile(uploaded_file):
     """Save uploaded file and return absolute file path"""
@@ -92,6 +93,8 @@ def extract_data_with_regex(raw_text):
 
 
 #------------------------------------------------------------------------------------#
+# In utils.py - Enhance extract_preprocessing_info function
+
 def extract_preprocessing_info(raw_text):
     """Extract preprocessing information in a dataset-agnostic way"""
     result = {}
@@ -106,7 +109,7 @@ def extract_preprocessing_info(raw_text):
         result["final_shape"] = [int(final_shape_match.group(1)), int(final_shape_match.group(2))]
     
     # Extract other metrics
-    for metric in ["original_missing_values", "final_missing_values", "duplicates_removed", "outliers_handled","missing_values_handled"]:
+    for metric in ["original_missing_values", "final_missing_values", "duplicates_removed", "outliers_handled", "missing_values_handled"]:
         metric_match = re.search(rf'"{metric}":\s*(\d+)', raw_text)
         if metric_match:
             result[metric] = int(metric_match.group(1))
@@ -136,15 +139,6 @@ def extract_preprocessing_info(raw_text):
         if transformations:
             result["transformations_applied"] = transformations
     
-    # Extract original column dtypes
-    original_dtypes_match = re.search(r'"dtypes":\s*\{(.*?)\}', raw_text, re.DOTALL)
-    if original_dtypes_match:
-        dtypes_str = original_dtypes_match.group(1)
-        # Extract key-value pairs
-        dtype_pairs = re.findall(r'"([^"]+)":\s*"([^"]+)"', dtypes_str)
-        if dtype_pairs:
-            result["dtypes"] = {col: dtype for col, dtype in dtype_pairs}
-    
     # Extract column dtypes
     dtypes_match = re.search(r'"columns_dtypes":\s*\{(.*?)\}', raw_text, re.DOTALL)
     if dtypes_match:
@@ -154,70 +148,160 @@ def extract_preprocessing_info(raw_text):
         if dtype_pairs:
             result["columns_dtypes"] = {col: dtype for col, dtype in dtype_pairs}
     
-    # Add type conversion extraction
-    type_conversions_match = re.search(r'"column_type_changes":\s*(\{.*?\})', raw_text, re.DOTALL)
-    if type_conversions_match:
-        conversions_str = type_conversions_match.group(1)
+    # Extract original dtypes if available
+    original_dtypes_match = re.search(r'"original_dtypes":\s*\{(.*?)\}', raw_text, re.DOTALL)
+    if original_dtypes_match:
+        dtypes_str = original_dtypes_match.group(1)
+        # Extract key-value pairs
+        dtype_pairs = re.findall(r'"([^"]+)":\s*"([^"]+)"', dtypes_str)
+        if dtype_pairs:
+            result["original_dtypes"] = {col: dtype for col, dtype in dtype_pairs}
+    elif not "columns_dtypes" in result:
+        # Fallback to regular dtypes if columns_dtypes not found
+        dtypes_match = re.search(r'"dtypes":\s*\{(.*?)\}', raw_text, re.DOTALL)
+        if dtypes_match:
+            dtypes_str = dtypes_match.group(1)
+            # Extract key-value pairs
+            dtype_pairs = re.findall(r'"([^"]+)":\s*"([^"]+)"', dtypes_str)
+            if dtype_pairs:
+                result["columns_dtypes"] = {col: dtype for col, dtype in dtype_pairs}
+    
+    # Look for type conversions using multiple possible key patterns
+    # Try "column_type_changes" first
+    type_conversion_keys = [
+        "column_type_changes",
+        "type_conversions",
+        "dtypes_converted",
+        "data_type_conversions"
+        "converted_dtypes",
+        "data_type_changes"
+    ]
+    
+    for key in type_conversion_keys:
+        key_pattern = rf'"{key}":\s*(\{{.*?\}})'
+        type_match = re.search(key_pattern, raw_text, re.DOTALL)
         
-        try:
-            # Clean and parse the type conversions
-            cleaned_str = preprocess_for_json(conversions_str)
-            result["column_type_changes"] = json.loads(cleaned_str)
-        except json.JSONDecodeError:
-            # Fallback to regex extraction if JSON parsing fails
-            conversions = {}
-            conv_matches = re.findall(r'"([^"]+)":\s*\{([^}]+)\}', conversions_str)
-            
-            for column, type_info in conv_matches:
-                # Extract original and new types
-                original_match = re.search(r'"original":\s*"([^"]+)"', type_info)
-                new_match = re.search(r'"new":\s*"([^"]+)"', type_info)
+        if type_match:
+            type_str = type_match.group(1)
+            try:
+                # Clean and parse the type conversions
+                cleaned_str = preprocess_for_json(type_str)
+                parsed_types = json.loads(cleaned_str)
+                result["column_type_changes"] = parsed_types
+                break  # Found and parsed successfully, break the loop
+            except json.JSONDecodeError:
+                # Fallback to regex extraction if JSON parsing fails
+                conversions = {}
+                conv_matches = re.findall(r'"([^"]+)":\s*\{([^}]+)\}', type_str)
                 
-                if original_match and new_match:
-                    conversions[column] = {
-                        "original": original_match.group(1),
-                        "new": new_match.group(1)
-                    }
+                for column, type_info in conv_matches:
+                    # Extract original and new types
+                    original_match = re.search(r'"original":\s*"([^"]+)"', type_info)
+                    new_match = re.search(r'"new":\s*"([^"]+)"', type_info)
+                    from_match = re.search(r'"from_type":\s*"([^"]+)"', type_info)
+                    to_match = re.search(r'"to_type":\s*"([^"]+)"', type_info)
+                    
+                    if original_match and new_match:
+                        conversions[column] = {
+                            "original": original_match.group(1),
+                            "new": new_match.group(1)
+                        }
+                    elif from_match and to_match:
+                        conversions[column] = {
+                            "original": from_match.group(1),
+                            "new": to_match.group(1)
+                        }
+                
+                if conversions:
+                    result["column_type_changes"] = conversions
+                    break  # Found and extracted via regex, break the loop
+    
+    # If still no type conversions found, try looking for a list format
+    if "column_type_changes" not in result:
+        for key in type_conversion_keys:
+            key_pattern = rf'"{key}":\s*(\[.*?\])'
+            type_match = re.search(key_pattern, raw_text, re.DOTALL)
+            
+            if type_match:
+                type_str = type_match.group(1)
+                try:
+                    # Clean and parse the list of type conversions
+                    cleaned_str = preprocess_for_json(type_str)
+                    parsed_types = json.loads(cleaned_str)
+                    
+                    # Convert to our standard format if it's a list
+                    if isinstance(parsed_types, list):
+                        conversions = {}
+                        for item in parsed_types:
+                            if isinstance(item, dict) and "column" in item:
+                                col_name = item["column"]
+                                conversions[col_name] = {
+                                    "original": item.get("original", item.get("from_type", "unknown")),
+                                    "new": item.get("new", item.get("to_type", "unknown"))
+                                }
+                        if conversions:
+                            result["column_type_changes"] = conversions
+                            break
+                except json.JSONDecodeError:
+                    pass
+    
+    # Fallback method: look for type conversion patterns in the raw text
+    if "column_type_changes" not in result:
+        # Pattern for "Column X converted from type Y to Z"
+        conv_pattern = r'([a-zA-Z0-9_]+) (?:column |)(?:converted|changed) from (?:type |)([a-zA-Z0-9_]+) to ([a-zA-Z0-9_]+)'
+        conv_matches = re.findall(conv_pattern, raw_text)
+        
+        if conv_matches:
+            conversions = {}
+            for column, from_type, to_type in conv_matches:
+                conversions[column.strip()] = {
+                    "original": from_type.strip(),
+                    "new": to_type.strip()
+                }
             
             if conversions:
                 result["column_type_changes"] = conversions
     
-    # Extract preview data in a more generic way
-    preview_match = re.search(r'"dataset_preview":\s*(\[.*?\])', raw_text, re.DOTALL)
-    if preview_match:
-        preview_str = preview_match.group(1)
-        # First attempt to parse as JSON
-        try:
-            cleaned_json = re.sub(r'(\w+):', r'"\1":', preview_str)
-            cleaned_json = re.sub(r'\'', r'"', cleaned_json)
-            cleaned_json = re.sub(r',\s*\]', ']', cleaned_json)
-            
-            preview_data = json.loads(cleaned_json)
-            result["dataset_preview"] = preview_data
-        except json.JSONDecodeError:
-            # Fallback to regex extraction
-            objects = []
-            object_matches = re.findall(r'\{([^{}]*)\}', preview_str)
-            for obj_str in object_matches:
-                pairs = re.findall(r'"?([^":,\s]+)"?\s*:\s*("[^"]*"|[^",\s]+)', obj_str)
-                if pairs:
-                    obj = {}
-                    for key, val in pairs:
-                        if val.startswith('"') and val.endswith('"'):
-                            obj[key] = val[1:-1]
-                        elif val.lower() in ['true', 'false']:
-                            obj[key] = val.lower() == 'true'
-                        elif val.lower() == 'null':
-                            obj[key] = None
-                        else:
-                            try:
-                                obj[key] = float(val) if '.' in val else int(val)
-                            except:
-                                obj[key] = val
-                    objects.append(obj)
-            
-            if objects:
-                result["preview"] = objects
+    # Extract preview data using multiple possible key patterns
+    preview_keys = ["dataset_preview", "data_preview", "preview", "cleaned_data"]
+    
+    for key in preview_keys:
+        preview_pattern = rf'"{key}":\s*(\[.*?\])'
+        preview_match = re.search(preview_pattern, raw_text, re.DOTALL)
+        
+        if preview_match:
+            preview_str = preview_match.group(1)
+            # First attempt to parse as JSON
+            try:
+                cleaned_json = preprocess_for_json(preview_str)
+                preview_data = json.loads(cleaned_json)
+                result["dataset_preview"] = preview_data
+                break  # Successfully parsed, break the loop
+            except json.JSONDecodeError:
+                # Fallback to regex extraction for objects
+                objects = []
+                object_matches = re.findall(r'\{([^{}]*)\}', preview_str)
+                for obj_str in object_matches:
+                    pairs = re.findall(r'"?([^":,\s]+)"?\s*:\s*("[^"]*"|[^",\s]+)', obj_str)
+                    if pairs:
+                        obj = {}
+                        for key, val in pairs:
+                            if val.startswith('"') and val.endswith('"'):
+                                obj[key] = val[1:-1]
+                            elif val.lower() in ['true', 'false']:
+                                obj[key] = val.lower() == 'true'
+                            elif val.lower() == 'null':
+                                obj[key] = None
+                            else:
+                                try:
+                                    obj[key] = float(val) if '.' in val else int(val)
+                                except:
+                                    obj[key] = val
+                        objects.append(obj)
+                
+                if objects:
+                    result["dataset_preview"] = objects
+                    break  # Successfully extracted objects, break the loop
     
     # Extract file path
     file_path_match = re.search(r'"preprocessed_file_path":\s*"([^"]+)"', raw_text)
@@ -225,7 +309,6 @@ def extract_preprocessing_info(raw_text):
         result["preprocessed_file_path"] = file_path_match.group(1)
     
     return result
-
 #---------------------------------------------------------------------------------------------#
 def preprocess_for_json(raw_content):
     """Preprocess raw content to ensure it is valid JSON"""
@@ -285,7 +368,7 @@ def parse_json_safely(raw_text):
     
     # Look for common patterns that might indicate a JSON structure
     for key in ["dataset_shape", "preview", "dtypes", "original_shape", "final_shape", 
-                "columns_dropped", "transformations_applied", "columns_dtypes","dataset_preview"]:
+                "columns_dropped", "transformations_applied", "columns_dtypes","dataset_preview","preprocessed_datast_preview" , "data_type_conversions"]:
         
         # Look for array values
         array_pattern = rf'"{key}":\s*(\[.*?\])'
@@ -333,8 +416,10 @@ def parse_json_safely(raw_text):
     nested_dict_keys = [
         "column_type_changes", 
         "dtypes_converted", 
-        "type_conversions"
-    ]
+        "type_conversions",
+        "data_type_conversions",
+        "converted_dtypes",
+        ]
 
     for key in nested_dict_keys:
         nested_pattern = rf'"{key}":\s*(\{{.*?\}})'

@@ -273,6 +273,7 @@ def main():
                     # Process with CrewAI
                     with st.spinner('Processing dataset... Please wait'):
                         crew_output = deva.crew().kickoff(inputs=inputs)
+                        st.write(crew_output)
 
                     # Process task outputs
                     if hasattr(crew_output, 'tasks_output'):

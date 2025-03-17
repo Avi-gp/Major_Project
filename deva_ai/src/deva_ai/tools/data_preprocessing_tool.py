@@ -210,23 +210,57 @@ class DataPreprocessingTool(BaseTool):
         return df, preprocessing_steps
     
     def _convert_numeric_columns(self, df):
-        """Convert object columns to numeric where possible."""
+        """
+        Convert object columns with numeric content to appropriate numeric dtypes,
+        while preserving integer types when possible.
+        
+        Args:
+            df (pd.DataFrame): DataFrame to process
+            
+        Returns:
+            tuple: (processed_df, list_of_converted_columns)
+        """
         converted_columns = []
         
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                # Check if column can be converted to numeric
-                try:
-                    # Try to convert to numeric, coerce errors
-                    numeric_series = pd.to_numeric(df[col], errors='coerce')
-                    
-                    # If >80% of values converted successfully, keep the conversion
-                    non_null_pct = numeric_series.notna().mean()
-                    if non_null_pct > 0.8:
+        # Only process object columns
+        object_columns = df.select_dtypes(include=['object']).columns
+        
+        for col in object_columns:
+            # Skip columns with too few values
+            if df[col].count() < 5:
+                continue
+            
+            # Check if column can be converted to numeric
+            try:
+                # Try to convert to numeric, coerce errors to NaN
+                numeric_series = pd.to_numeric(df[col], errors='coerce')
+                
+                # If >80% of values converted successfully, keep the conversion
+                non_null_count = df[col].count()
+                non_null_numeric_count = numeric_series.notna().sum()
+                success_rate = non_null_numeric_count / non_null_count if non_null_count > 0 else 0
+                
+                if success_rate > 0.8:
+                    # Determine if the column should be integer or float
+                    if pd.notna(numeric_series).all() and numeric_series.apply(lambda x: x.is_integer() if pd.notna(x) else True).all():
+                        # All values are integers (or NaN), convert to Int64 (nullable integer)
+                        # This preserves NaN values while keeping integer type
+                        try:
+                            df[col] = pd.to_numeric(df[col], errors='coerce').astype('Int64')
+                        except (TypeError, ValueError):
+                            # Fallback to float if Int64 conversion fails
+                            df[col] = numeric_series
+                    else:
+                        # Some values are floats or mixed, convert to float
                         df[col] = numeric_series
-                        converted_columns.append(col)
-                except:
-                    pass
+                    
+                    converted_columns.append(col)
+                    
+                    # Log the conversion
+                    logging.info(f"Converted column '{col}' from object to {df[col].dtype}")
+            except Exception as e:
+                # If conversion fails, keep the original column
+                logging.debug(f"Could not convert column '{col}' to numeric: {str(e)}")
         
         return df, converted_columns
     
@@ -284,7 +318,7 @@ class DataPreprocessingTool(BaseTool):
                     cleaned_columns.append(col)
                 
                 # Remove special characters if needed
-                if df[col].astype(str).str.contains('[^\w\s]').any():
+                if df[col].astype(str).str.contains(r'[^\w\s]').any():
                     df[col] = df[col].astype(str).str.replace(r'[^\w\s]', '', regex=True)
                     if col not in cleaned_columns:
                         cleaned_columns.append(col)
@@ -292,37 +326,114 @@ class DataPreprocessingTool(BaseTool):
         return df, cleaned_columns
     
     def _infer_datetime_columns(self, df):
-        """Detect and convert columns with datetime format."""
+        """
+        Efficiently detect and convert columns with datetime format.
+        
+        Args:
+            df (pd.DataFrame): DataFrame to process
+            
+        Returns:
+            tuple: (processed_df, list_of_datetime_columns)
+        """
         datetime_columns = []
         
-        # Common datetime patterns to check
+        # Common datetime patterns to check - ordered by frequency to optimize performance
         date_patterns = [
-            r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
-            r'\d{2}-\d{2}-\d{4}',  # DD-MM-YYYY
-            r'\d{2}/\d{2}/\d{4}',  # MM/DD/YYYY
-            r'\d{4}/\d{2}/\d{2}',  # YYYY/MM/DD
-            r'\d{2}\.\d{2}\.\d{4}',  # DD.MM.YYYY
-            r'\w+ \d{1,2}, \d{4}'   # Month DD, YYYY
+            r'\d{4}-\d{2}-\d{2}',              # YYYY-MM-DD (ISO format)
+            r'\d{1,2}/\d{1,2}/\d{4}',          # M/D/YYYY or MM/DD/YYYY (US format)
+            r'\d{1,2}-\d{1,2}-\d{4}',          # D-M-YYYY or DD-MM-YYYY
+            r'\d{4}/\d{1,2}/\d{1,2}',          # YYYY/M/D or YYYY/MM/DD
+            r'\d{1,2}\.\d{1,2}\.\d{4}',        # D.M.YYYY or DD.MM.YYYY (European)
+            r'\d{2}:\d{2}:\d{2}',              # HH:MM:SS (time only)
+            r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}',  # ISO with time
+            r'\d{2}:\d{2}:\d{4}',              # DD:MM:YYYY
+            r'\w+ \d{1,2}, \d{4}',             # Month DD, YYYY
+            r'\d{1,2} \w+ \d{4}'               # DD Month YYYY
         ]
         
-        for col in df.columns:
-            if df[col].dtype == 'object':
-                # Check if column contains dates
-                sample = df[col].dropna().astype(str).sample(min(100, len(df))).tolist()
-                
-                date_match = False
-                for pattern in date_patterns:
-                    if any(re.search(pattern, str(val)) for val in sample):
-                        date_match = True
-                        break
-                
-                if date_match:
-                    try:
-                        # Try parsing the dates
-                        df[col] = pd.to_datetime(df[col], errors='coerce')
+        # Compile patterns for efficiency
+        compiled_patterns = [re.compile(pattern) for pattern in date_patterns]
+        
+        # Efficient screening - only process object columns
+        object_columns = df.select_dtypes(include=['object']).columns
+        
+        for col in object_columns:
+            # Skip columns with too many unique values or too few values
+            non_null_count = df[col].count()
+            unique_count = df[col].nunique()
+            
+            # Skip if too few values or if cardinality is too high (likely not a date)
+            if non_null_count < 5 or unique_count < 3 or unique_count > 0.9 * non_null_count:
+                continue
+            
+            # Initial fast check: Try to convert a small sample first
+            fast_sample = df[col].dropna().head(5).astype(str)
+            
+            # Quick pattern match on sample
+            date_match = False
+            for pattern in compiled_patterns:
+                if any(pattern.search(str(val)) for val in fast_sample):
+                    date_match = True
+                    break
+            
+            if not date_match:
+                # If no match in the small sample, take a larger random sample
+                if non_null_count > 5:
+                    sample_size = min(100, non_null_count)
+                    random_sample = df[col].dropna().astype(str).sample(sample_size).tolist()
+                    
+                    for pattern in compiled_patterns:
+                        if any(pattern.search(str(val)) for val in random_sample):
+                            date_match = True
+                            break
+            
+            if date_match:
+                # Try fast conversion with errors='coerce'
+                try:
+                    # Process in chunks for large columns to avoid memory issues
+                    if len(df) > 100000:
+                        # Process in chunks of 100k rows
+                        chunk_size = 100000
+                        temp_series = pd.Series(index=df.index, dtype='datetime64[ns]')
+                        
+                        for i in range(0, len(df), chunk_size):
+                            end_idx = min(i + chunk_size, len(df))
+                            chunk = df.iloc[i:end_idx]
+                            temp_series.iloc[i:end_idx] = pd.to_datetime(
+                                chunk[col], errors='coerce', infer_datetime_format=True
+                            )
+                    else:
+                        # Standard conversion for smaller dataframes
+                        temp_series = pd.to_datetime(
+                            df[col], errors='coerce', infer_datetime_format=True
+                        )
+                    
+                    # Only convert if significant portion was successfully parsed (threshold: 80%)
+                    non_nat_count = temp_series.notna().sum()
+                    success_rate = non_nat_count / non_null_count if non_null_count > 0 else 0
+                    
+                    if success_rate >= 0.8:
+                        # Update the column with the datetime values
+                        df[col] = temp_series
                         datetime_columns.append(col)
-                    except:
-                        pass
+                        
+                        # Extract metadata about the datetime column
+                        if non_nat_count > 0:
+                            sample_dates = temp_series.dropna().sample(min(10, non_nat_count)).dt.to_pydatetime()
+                            has_time = any(t.time() != datetime.min.time() for t in sample_dates)
+                            has_date = any(d.date() != datetime.min.date() for d in sample_dates)
+                            
+                            # Set appropriate datetime format based on content
+                            if has_time and has_date:
+                                # Full datetime format
+                                pass  # Use default datetime format
+                            elif has_date and not has_time:
+                                # Date only format
+                                df[col] = pd.to_datetime(df[col].dt.date)
+                            # Time only columns would need special handling if needed
+                    
+                except Exception as e:
+                    logging.warning(f"Failed to convert column '{col}' to datetime: {str(e)}")
         
         return df, datetime_columns
     
@@ -333,16 +444,109 @@ class DataPreprocessingTool(BaseTool):
         for col in df.columns:
             # Get count of missing values in this column
             missing_count = df[col].isna().sum()
+            
+            # Also check for string 'nan', 'Nan', 'NaN' values in object columns
+            if df[col].dtype == 'object':
+                nan_strings_mask = df[col].isin(['nan', 'Nan', 'NaN'])
+                string_nan_count = nan_strings_mask.sum()
+                if string_nan_count > 0:
+                    # Convert string NaN values to actual NaN
+                    df.loc[nan_strings_mask, col] = np.nan
+                    missing_count += string_nan_count
+            
             if missing_count > 0:
                 if pd.api.types.is_numeric_dtype(df[col]):
-                    # For numeric columns, use median imputation
-                    df[col] = df[col].fillna(df[col].median())
+                    # For numeric columns, use adaptive imputation
+                    
+                    # Check for skewness (to decide between mean and median)
+                    skewness = df[col].skew()
+                    
+                    # Check if there are potential grouping variables
+                    correlation_threshold = 0.3
+                    potential_groupers = []
+                    
+                    # Find categorical columns that might be related
+                    for other_col in df.columns:
+                        if other_col != col and (pd.api.types.is_categorical_dtype(df[other_col]) or df[other_col].dtype == 'object'):
+                            # Could implement correlation ratio here for more sophisticated approach
+                            potential_groupers.append(other_col)
+                    
+                    # If distribution is highly skewed, use median
+                    if abs(skewness) > 1.0:
+                        df[col] = df[col].fillna(df[col].median())
+                    
+                    # If we have potential grouping variables and enough data, use group-based imputation
+                    elif potential_groupers and len(df) > 100:
+                        # Take first potential grouper (could be more sophisticated)
+                        grouper = potential_groupers[0]
+                        
+                        # Calculate group medians
+                        group_medians = df.groupby(grouper)[col].median()
+                        
+                        # Apply group medians where possible
+                        for group, median in group_medians.items():
+                            mask = (df[grouper] == group) & (df[col].isna())
+                            df.loc[mask, col] = median
+                            
+                        # Fill any remaining NaNs with overall median
+                        df[col] = df[col].fillna(df[col].median())
+                    
+                    # For normal-ish distributions, use mean
+                    else:
+                        df[col] = df[col].fillna(df[col].mean())
+                    
                     missing_values_handled += missing_count
-                elif pd.api.types.is_datetime64_dtype(df[col]):
-                    # For datetime columns, use forward fill or drop
-                    if missing_count / len(df) < 0.2:  # If less than 20% missing
-                        df[col] = df[col].fillna(method='ffill')
-                        missing_values_handled += missing_count
+                    
+                elif pd.api.types.is_datetime64_dtype(df[col]) or pd.api.types.is_datetime64_any_dtype(df[col]):
+                    # Enhanced datetime handling: first try imputation, then drop rows with missing values
+                    try:
+                        # Step 1: Try imputation methods first
+                        
+                        # Create a temporary series for imputation attempts
+                        df_temp = df[col].copy()
+                        
+                        # Check if we have any non-NA values to work with
+                        if df_temp.notna().any():
+                            # Try forward fill first (for time series data)
+                            df_temp = df_temp.fillna(method='ffill')
+                            
+                            # Then try backward fill for any remaining NaNs
+                            df_temp = df_temp.fillna(method='bfill')
+                            
+                            # If there are still NaNs, try median imputation
+                            if df_temp.isna().any():
+                                median_date = df[col].dropna().median()
+                                if pd.notna(median_date):
+                                    df_temp = df_temp.fillna(median_date)
+                        
+                        # Apply the imputed values back to the original dataframe
+                        df[col] = df_temp
+                        
+                        # Step 2: After all imputation attempts, check for any remaining NaNs
+                        remaining_nans = df[col].isna().sum()
+                        
+                        if remaining_nans > 0:
+                            # Drop rows with remaining NaN values in this column
+                            original_len = len(df)
+                            df = df.dropna(subset=[col]).reset_index(drop=True)
+                            rows_dropped = original_len - len(df)
+                            missing_values_handled += rows_dropped
+                            logging.info(f"Dropped {rows_dropped} rows with missing datetime values in column '{col}' after imputation attempts")
+                        else:
+                            # All values were successfully imputed
+                            missing_values_handled += missing_count
+                            
+                    except Exception as e:
+                        # As a fallback, drop rows with missing datetime values
+                        logging.warning(f"Failed to impute datetime values in {col}: {str(e)}")
+                        
+                        # Drop rows with missing values in this column
+                        original_len = len(df)
+                        df = df.dropna(subset=[col]).reset_index(drop=True)
+                        rows_dropped = original_len - len(df)
+                        missing_values_handled += rows_dropped
+                        logging.info(f"Exception occurred. Dropped {rows_dropped} rows with missing datetime values in column '{col}'")
+                
                 else:
                     # For categorical/string columns, fill with mode
                     mode_val = df[col].mode().iloc[0] if not df[col].mode().empty else "Unknown"
@@ -350,7 +554,7 @@ class DataPreprocessingTool(BaseTool):
                     missing_values_handled += missing_count
         
         return df, missing_values_handled
-    
+
     def _handle_outliers(self, df):
         """Detect and handle outliers using IQR method."""
         outliers_handled = 0
