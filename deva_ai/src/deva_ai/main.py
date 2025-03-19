@@ -7,7 +7,7 @@ from crew import DevaAi
 from utils import save_uploadedfile , extract_data_with_regex , extract_preprocessing_info , preprocess_for_json , parse_json_safely , extract_value
 from streamlit_components.data_ingestion_output import display_data_ingestion_results
 from streamlit_components.data_preprocessing_output import display_preprocessing_results
-
+#from streamlit_components.feature_engineering_output import display_feature_engineering_results
 
 # Set the page configuration as the first Streamlit command
 st.set_page_config(page_title="DEVA AI : AI-Powered Data Analytics", layout="wide")
@@ -240,8 +240,8 @@ def main():
                     </ul>
                 </div>
             """, unsafe_allow_html=True)
-        
-        # File upload section
+
+        # Upload file section            
         st.markdown('<h2 class="subheader">Upload Your Dataset</h2>', unsafe_allow_html=True)
         uploaded_file = st.file_uploader("Choose a CSV or Excel file", type=["csv", "xlsx"])
 
@@ -265,16 +265,19 @@ def main():
                     deva = DevaAi()
                     
                     # Prepare input for CrewAI with file path
+                    
                     inputs = {
                         "file_path": file_path,
-                        "file_name": uploaded_file.name
+                        "file_name": uploaded_file.name,
+                        "preprocessed_file_path":"",
+                        "preprocessed_file_name":""
                     }
-                    
-                    # Process with CrewAI
+
                     with st.spinner('Processing dataset... Please wait'):
                         crew_output = deva.crew().kickoff(inputs=inputs)
                         
-                    # Process task outputs
+                    # Process task outputs and display results
+
                     if hasattr(crew_output, 'tasks_output'):
                         # Display progress
                         progress_bar = st.progress(0)
@@ -288,8 +291,15 @@ def main():
                         # Task 1: Preprocessing Results
                         if len(crew_output.tasks_output) > 1:
                             display_preprocessing_results(crew_output.tasks_output[1])
-                            progress_bar.progress(100)
+                            progress_bar.progress(75)
                             st.success("✅ Data preprocessing completed!")
+
+                        # Task 2: Feature Engineering Results
+                        if len(crew_output.tasks_output) > 2:
+                            st.write(crew_output.tasks_output[2].raw)
+                            #display_feature_engineering_results(crew_output.tasks_output[2])
+                            progress_bar.progress(100)
+                            st.success("✅ Feature Engineering completed!")
                         
                         # Clear progress bar after completion
                         progress_bar.empty()

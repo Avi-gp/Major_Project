@@ -1,7 +1,10 @@
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
+from regex import D
+from streamlit import context
 from tools.file_handling_tool import FileHandlingTool
 from tools.data_preprocessing_tool import DataPreprocessingTool
+from tools.feature_engineering_tool import FeatureEngineeringTool
 from dotenv import load_dotenv
 import os
 import yaml
@@ -22,7 +25,7 @@ LLM_model = LLM(
 # Initialize custom tools
 file_handling_tool = FileHandlingTool()
 data_preprocessing_tool = DataPreprocessingTool()
-
+feature_engineering_tool = FeatureEngineeringTool()
 
 @CrewBase
 class DevaAi:
@@ -49,6 +52,15 @@ class DevaAi:
             verbose=True,
             llm=LLM_model
         )
+    
+    @agent
+    def feature_engineering_agent(self) -> Agent:
+        return Agent(
+            config=self.agents_config['FeatureEngineeringAgent'],
+            tools=[feature_engineering_tool],
+            verbose=True,
+            llm=LLM_model
+        )
 
     @task
     def data_ingestion_task(self) -> Task:
@@ -67,7 +79,19 @@ class DevaAi:
             tools=[data_preprocessing_tool],
             verbose=True
         )
-
+    
+    @task
+    def feature_engineering_task(self) -> Task:
+        return Task(
+            config=self.tasks_config['FeatureEngineeringTask'],
+            agent=self.feature_engineering_agent(),
+            tools=[feature_engineering_tool],
+            context=[self.data_preprocessing_task()],
+            input={"preprocessed_file_path": "preprocessed_file_path",
+                "preprocessed_file_name": "preprocessed_file_name"},     
+            verbose=True
+        )
+    
     @crew
     def crew(self) -> Crew:
         """Creates the DevaAi crew"""

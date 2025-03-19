@@ -97,7 +97,8 @@ class DataPreprocessingTool(BaseTool):
                 "columns": df.columns.tolist(),
                 "columns_dtypes": final_dtypes,
                 "column_type_changes": type_changes,
-                "preprocessed_file_path": preprocessed_file_path
+                "preprocessed_file_path": preprocessed_file_path,
+                "preprocessed_file_name": os.path.basename(preprocessed_file_path)
             }
             
             # Return as a clean JSON string
