@@ -7,7 +7,7 @@ from crew import DevaAi
 from utils import save_uploadedfile , extract_data_with_regex , extract_preprocessing_info , preprocess_for_json , parse_json_safely , extract_value
 from streamlit_components.data_ingestion_output import display_data_ingestion_results
 from streamlit_components.data_preprocessing_output import display_preprocessing_results
-#from streamlit_components.feature_engineering_output import display_feature_engineering_results
+from streamlit_components.feature_engineering_output import display_feature_engineering_results
 
 # Set the page configuration as the first Streamlit command
 st.set_page_config(page_title="DEVA AI : AI-Powered Data Analytics", layout="wide")
@@ -296,8 +296,7 @@ def main():
 
                         # Task 2: Feature Engineering Results
                         if len(crew_output.tasks_output) > 2:
-                            st.write(crew_output.tasks_output[2].raw)
-                            #display_feature_engineering_results(crew_output.tasks_output[2])
+                            display_feature_engineering_results(crew_output.tasks_output[2])
                             progress_bar.progress(100)
                             st.success("✅ Feature Engineering completed!")
                         
