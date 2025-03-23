@@ -46,14 +46,8 @@ FeatureEngineeringTask:
        - Min-Max scaling (normalization to [0,1] range)
        - Robust scaling for data with outliers
     2. Categorical Feature Encoding:
-       - One-hot encoding for nominal categories
-       - Label encoding for ordinal categories
-       - Target encoding for high-cardinality categories
-    3. Feature Selection:
-       - Correlation-based feature selection
-       - Variance threshold filtering
-       - Feature importance evaluation using Random Forest
-       - Suggest features that could be dropped (rather than automatically dropping them)
+       - One-hot encoding for binary categories
+       - Label encoding for non-binary categories
   expected_output: >
     A dictionary containing feature engineering statistics and information. Return the results in a valid JSON format with the following required keys:
     - "original_shape": [rows, columns] - Shape before feature engineering
@@ -62,10 +56,7 @@ FeatureEngineeringTask:
     - "categorical_features": [...] - List of categorical feature names
     - "scaling_methods_applied": {...} - Dictionary mapping numerical columns to scaling methods applied
     - "encoding_methods_applied": {...} - Dictionary mapping categorical columns to encoding methods applied
-    - "target_column": string - Name of the target column used for feature importance evaluation
-    - "feature_importance": {...} - Dictionary mapping feature names to their importance scores
-    - "suggested_features_to_drop": [{"feature": "feature_name", "reason": "reason for suggesting to drop"}] - List of dictionaries with feature names and reasons they could be dropped
-    - "high_correlation_pairs": [[feature1, feature2, correlation_value], ...] - List of highly correlated feature pairs
     - "engineered_preview": [...] - List of dictionaries representing the first few rows of the engineered dataset
     - "engineered_file_path": string - Path to the saved engineered features file
+    - "engineered_file_name": string - Name of the saved engineered features file
     Save the transformed dataset to a new file with all engineering steps applied.

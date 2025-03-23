@@ -10,7 +10,7 @@ from streamlit_components.data_preprocessing_output import display_preprocessing
 from streamlit_components.feature_engineering_output import display_feature_engineering_results
 
 # Set the page configuration as the first Streamlit command
-st.set_page_config(page_title="DEVA AI : AI-Powered Data Analytics", layout="wide")
+st.set_page_config(page_title="DEVA AI : AI-Powered Data Analysis", layout="wide")
 
 if "page" not in st.session_state:
     st.session_state.page = "Home"
@@ -217,10 +217,10 @@ def main():
     # Main content based on selected page
     if page == "Home":
         # Title with icon
-        st.markdown('<h1 class="title">🧑‍💼 DEVA AI : AI-Powered Data Analytics </h1>', unsafe_allow_html=True)
+        st.markdown('<h1 class="title">🧑‍💼 DEVA AI : AI-Powered Data Analysis </h1>', unsafe_allow_html=True)
         
         # Introduction
-        col1, col2 = st.columns([2, 1])
+        col1, col2 = st.columns([1.3,1])
         with col1:
             st.markdown("""
                 <div class="card">

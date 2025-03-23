@@ -8,29 +8,24 @@ import os
 import logging
 import json
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler, LabelEncoder, OneHotEncoder
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 class FeatureEngineeringInput(BaseModel):
     """Input schema for FeatureEngineeringTool that uses file path."""
     preprocessed_file_path: str = Field(..., description="Absolute path to the preprocessed file.")
     preprocessed_file_name: str = Field(..., description="The name of the preprocessed file.")
-    target_column: Optional[str] = Field(None, description="Name of the target column for feature importance evaluation. If not provided, user will be prompted.")
 
 class FeatureEngineeringTool(BaseTool):
     name: str = "Feature Engineering Tool"
-    description: str = "Transform preprocessed data by applying scaling techniques for numerical data, encoding methods for categorical data, and feature selection"
+    description: str = "Transform preprocessed data by applying scaling techniques for numerical data and encoding methods for categorical data"
     args_schema: Type[BaseModel] = FeatureEngineeringInput
 
-    def _run(self, preprocessed_file_path: str, preprocessed_file_name: str, target_column: Optional[str] = None) -> str:
+    def _run(self, preprocessed_file_path: str, preprocessed_file_name: str) -> str:
         """
-        Process the preprocessed file and perform comprehensive feature engineering.
+        Process the preprocessed file and perform feature engineering.
         
         Args:
             preprocessed_file_path (str): Absolute path to the preprocessed file
             preprocessed_file_name (str): Name of the preprocessed file
-            target_column (str, optional): Name of the target column for feature importance evaluation
             
         Returns:
             str: JSON string containing feature engineering results
@@ -53,21 +48,11 @@ class FeatureEngineeringTool(BaseTool):
             # Store original shape for comparison
             original_shape = df.shape
             
-            # Prompt for target column if not provided
-            if target_column is None:
-                print(f"Available columns: {', '.join(df.columns)}")
-                target_column = df.columns[-1]
-                if target_column.lower() == 'none':
-                    target_column = None
-                elif target_column not in df.columns:
-                    print(f"Warning: '{target_column}' is not a valid column name. Proceeding without target column.")
-                    target_column = None
-            
             # Identify feature types
             numerical_features, categorical_features = self._identify_feature_types(df)
             
             # Execute feature engineering steps
-            df, feature_engineering_stats = self._engineer_features(df, numerical_features, categorical_features, target_column)
+            df, feature_engineering_stats = self._engineer_features(df, numerical_features, categorical_features)
             
             # Generate a new file path for the engineered data
             engineered_dir = os.path.join(os.path.dirname(os.path.dirname(preprocessed_file_path)), "engineered")
@@ -97,11 +82,6 @@ class FeatureEngineeringTool(BaseTool):
                 "categorical_features": categorical_features,
                 "scaling_methods_applied": feature_engineering_stats["scaling_methods_applied"],
                 "encoding_methods_applied": feature_engineering_stats["encoding_methods_applied"],
-                "target_column": target_column,
-                "suggested_features_to_drop": feature_engineering_stats["suggested_features_to_drop"],
-                "high_correlation_pairs": feature_engineering_stats["high_correlation_pairs"],
-                "variance_filtered_features": feature_engineering_stats["variance_filtered_features"],
-                "feature_importance": feature_engineering_stats["feature_importance"],
                 "engineered_preview": df.head(preview_rows).to_dict('records'),
                 "engineered_file_path": engineered_file_path,
                 "engineered_file_name": os.path.basename(engineered_file_path)
@@ -182,7 +162,7 @@ class FeatureEngineeringTool(BaseTool):
         
         return numerical_features, categorical_features
     
-    def _engineer_features(self, df, numerical_features, categorical_features, target_column=None):
+    def _engineer_features(self, df, numerical_features, categorical_features):
         """
         Apply feature engineering to the DataFrame.
         
@@ -190,25 +170,15 @@ class FeatureEngineeringTool(BaseTool):
             df (pd.DataFrame): The DataFrame to engineer
             numerical_features (list): List of numerical feature names
             categorical_features (list): List of categorical feature names
-            target_column (str, optional): Name of the target column
             
         Returns:
             tuple: (engineered_df, feature_engineering_stats_dict)
         """
         feature_engineering_stats = {
             "scaling_methods_applied": {},
-            "encoding_methods_applied": {},
-            "suggested_features_to_drop": [],
-            "high_correlation_pairs": [],
-            "variance_filtered_features": [],
-            "feature_importance": {}
+            "encoding_methods_applied": {}
         }
         
-        # Store target column original values for later use in feature importance
-        y = None
-        if target_column and target_column in df.columns:
-            y = df[target_column].copy()
-            
         # Part 1: Numerical Feature Scaling
         df, scaling_stats = self._scale_numerical_features(df, numerical_features)
         feature_engineering_stats["scaling_methods_applied"] = scaling_stats
@@ -216,39 +186,6 @@ class FeatureEngineeringTool(BaseTool):
         # Part 2: Categorical Feature Encoding
         df, encoding_stats = self._encode_categorical_features(df, categorical_features)
         feature_engineering_stats["encoding_methods_applied"] = encoding_stats
-        
-        # Part 3: Feature Selection
-        # Now create temporary feature lists without the target column for feature selection
-        temp_numerical_features = numerical_features.copy()
-        temp_categorical_features = categorical_features.copy()
-        
-        # Remove target column from temporary feature lists only for feature selection
-        if target_column:
-            if target_column in temp_numerical_features:
-                temp_numerical_features.remove(target_column)
-            if target_column in temp_categorical_features:
-                temp_categorical_features.remove(target_column)
-        
-        # 3.1: Correlation-based feature selection
-        high_corr_pairs = self._find_correlated_features(df)
-        feature_engineering_stats["high_correlation_pairs"] = high_corr_pairs
-        
-        # 3.2: Variance threshold filtering
-        low_variance_features = self._find_low_variance_features(df)
-        feature_engineering_stats["variance_filtered_features"] = low_variance_features
-        
-        # 3.3: Feature importance evaluation using Random Forest
-        feature_importance = self._evaluate_feature_importance(df, y)
-        feature_engineering_stats["feature_importance"] = feature_importance
-        
-        # 3.4: Suggest features to drop based on previous analyses
-        suggested_drops = self._suggest_features_to_drop(
-            df, 
-            high_corr_pairs, 
-            low_variance_features, 
-            feature_importance
-        )
-        feature_engineering_stats["suggested_features_to_drop"] = suggested_drops
         
         return df, feature_engineering_stats
     
@@ -337,7 +274,7 @@ class FeatureEngineeringTool(BaseTool):
                 
                 # Keep the original column name
                 df[column] = encoded_vals
-                encoding_methods[column] = "one_hot_encoding_binary"
+                encoding_methods[column] = "one_hot_encoding"
                 
             # For all non-binary features (both low and high cardinality)
             else:
@@ -357,220 +294,6 @@ class FeatureEngineeringTool(BaseTool):
                 encoding_methods[column] = "label_encoding"
         
         return df, encoding_methods
-    
-    def _find_correlated_features(self, df, threshold=0.8):
-        """
-        Find highly correlated feature pairs.
-        
-        Args:
-            df (pd.DataFrame): DataFrame to analyze
-            threshold (float): Correlation threshold
-            
-        Returns:
-            list: List of tuples [(feature1, feature2, correlation_value), ...]
-        """
-        # Only consider numerical columns for correlation analysis
-        numeric_df = df.select_dtypes(include=['number'])
-        
-        # Skip if there are too few numeric columns
-        if numeric_df.shape[1] < 2:
-            return []
-        
-        # Calculate correlation matrix
-        corr_matrix = numeric_df.corr().abs()
-        
-        # Extract upper triangle excluding diagonal
-        upper_tri = corr_matrix.where(np.triu(np.ones(corr_matrix.shape), k=1).astype(bool))
-        
-        # Find feature pairs with correlation above threshold
-        high_corr_pairs = []
-        for col1 in upper_tri.columns:
-            for col2 in upper_tri.index:
-                if upper_tri.loc[col2, col1] > threshold:
-                    high_corr_pairs.append(
-                        (col1, col2, round(float(upper_tri.loc[col2, col1]), 3))
-                    )
-        
-        return high_corr_pairs
-    
-    def _find_low_variance_features(self, df, threshold=0.01):
-        """
-        Find features with variance below threshold.
-        
-        Args:
-            df (pd.DataFrame): DataFrame to analyze
-            threshold (float): Variance threshold
-            
-        Returns:
-            list: List of feature names with low variance
-        """
-        # Only consider numerical columns for variance analysis
-        numeric_df = df.select_dtypes(include=['number'])
-        
-        low_variance_features = []
-        for column in numeric_df.columns:
-            # Calculate variance
-            variance = df[column].var()
-            
-            # Check if variance is below threshold
-            if variance < threshold:
-                low_variance_features.append({
-                    "feature": column,
-                    "variance": float(variance)
-                })
-        
-        return low_variance_features
-    
-    def _evaluate_feature_importance(self, df, y=None):
-        """
-        Evaluate feature importance using a Random Forest model.
-        
-        Args:
-            df (pd.DataFrame): DataFrame with features
-            y (pd.Series, optional): Target variable
-            
-        Returns:
-            dict: Dictionary of feature importance scores
-        """
-        # Skip if no target provided
-        if y is None:
-            return {"target_column_used": False, "features": {}}
-        
-        # Consider all numeric columns for feature importance
-        numeric_df = df.select_dtypes(include=['number'])
-        
-        # Identify and exclude target column if it's in the dataframe
-        target_column_name = None
-        if y is not None and isinstance(y, pd.Series) and y.name in df.columns:
-            target_column_name = y.name
-            if target_column_name in numeric_df.columns:
-                numeric_df = numeric_df.drop(columns=[target_column_name])
-        
-        # Skip if there are too few features after target removal
-        if numeric_df.shape[1] < 1:
-            return {"target_column_used": True, "features": {}}
-        
-        try:
-            # Create X dataset for feature importance
-            X = numeric_df.fillna(0)  # Simple imputation for any remaining NaN values
-            
-            # Determine if classification or regression task
-            if pd.api.types.is_numeric_dtype(y):
-                # For numeric targets, use a regressor
-                unique_count = y.nunique()
-                if unique_count <= 10:  # Small number of unique values suggests classification
-                    model = RandomForestClassifier(n_estimators=50, random_state=42, n_jobs=-1)
-                else:
-                    model = RandomForestRegressor(n_estimators=50, random_state=42, n_jobs=-1)
-            else:
-                # For categorical targets, use a classifier
-                model = RandomForestClassifier(n_estimators=50, random_state=42, n_jobs=-1)
-            
-            # Train the model
-            model.fit(X, y)
-            
-            # Extract feature importances
-            importance_dict = {
-                "target_column_used": True,
-                "features": {}
-            }
-            
-            for i, column in enumerate(X.columns):
-                # Round the importance value to 4 decimal places
-                importance_dict["features"][column] = round(float(model.feature_importances_[i]), 4)
-            
-            # Sort by importance (descending)
-            importance_dict["features"] = {k: v for k, v in sorted(
-                importance_dict["features"].items(), key=lambda item: item[1], reverse=True
-            )}
-            
-            return importance_dict
-            
-        except Exception as e:
-            logging.warning(f"Could not evaluate feature importance: {str(e)}")
-            return {"target_column_used": True, "features": {}}
-    
-    def _suggest_features_to_drop(self, df, high_corr_pairs, low_variance_features, feature_importance):
-        """
-        Suggest features to drop based on analysis results.
-        
-        Args:
-            df (pd.DataFrame): DataFrame to analyze
-            high_corr_pairs (list): List of highly correlated feature pairs
-            low_variance_features (list): List of features with low variance
-            feature_importance (dict): Dictionary of feature importance scores with nested structure
-            
-        Returns:
-            list: List of dictionaries with feature names and reasons to drop
-        """
-        suggested_drops = []
-        
-        # Extract features dict from the new structure
-        features_importance = {}
-        if feature_importance and "features" in feature_importance:
-            features_importance = feature_importance["features"]
-        
-        # 1. Suggest dropping one feature from each highly correlated pair
-        already_suggested = set()
-        
-        for feature1, feature2, corr_value in high_corr_pairs:
-            # Skip if both features were already suggested
-            if feature1 in already_suggested and feature2 in already_suggested:
-                continue
-                
-            # Decide which feature to drop based on feature importance if available
-            if feature1 in features_importance and feature2 in features_importance:
-                # Drop the less important feature
-                if features_importance[feature1] < features_importance[feature2]:
-                    feature_to_drop = feature1
-                else:
-                    feature_to_drop = feature2
-            else:
-                # If no importance data, suggest the second feature arbitrarily
-                feature_to_drop = feature2
-            
-            # Add to suggestions if not already there
-            if feature_to_drop not in already_suggested:
-                suggested_drops.append({
-                    "feature": feature_to_drop,
-                    "reason": f"High correlation ({corr_value}) with {feature1 if feature_to_drop == feature2 else feature2}"
-                })
-                already_suggested.add(feature_to_drop)
-        
-        # 2. Suggest dropping features with very low variance
-        for feature_info in low_variance_features:
-            feature = feature_info["feature"]
-            variance = feature_info["variance"]
-            
-            # Skip if already suggested
-            if feature in already_suggested:
-                continue
-                
-            suggested_drops.append({
-                "feature": feature,
-                "reason": f"Low variance ({variance})"
-            })
-            already_suggested.add(feature)
-        
-        # 3. Suggest dropping features with very low importance
-        if features_importance:
-            # Get features with importance below 1% of max importance
-            max_importance = max(features_importance.values()) if features_importance else 0
-            importance_threshold = max_importance * 0.01
-            
-            for feature, importance in features_importance.items():
-                # Skip if already suggested
-                if feature in already_suggested:
-                    continue
-                    
-                if importance < importance_threshold:
-                    suggested_drops.append({
-                        "feature": feature,
-                        "reason": f"Low feature importance ({importance:.6f})"
-                    })
-                    already_suggested.add(feature)
-        
-        return suggested_drops
     
     def _detect_outliers(self, series):
         """

@@ -496,82 +496,62 @@ def extract_feature_engineering_info(raw_text):
     result = {}
     
     # Extract dataset shapes
-    for shape_key in ["original_shape", "final_shape"]:
-        shape_match = re.search(rf'"{shape_key}":\s*\[(\d+),\s*(\d+)\]', raw_text)
-        if shape_match:
-            result[shape_key] = [int(shape_match.group(1)), int(shape_match.group(2))]
-    
-    # Extract feature lists
-    for feature_key in ["numerical_features", "categorical_features"]:
-        features_match = re.search(rf'"{feature_key}":\s*\[(.*?)\]', raw_text)
-        if features_match:
-            features = re.findall(r'"([^"]+)"', features_match.group(1))
-            result[feature_key] = features
-    
-    # Extract methods applied
-    for method_key in ["scaling_methods_applied", "encoding_methods_applied"]:
-        methods_match = re.search(rf'"{method_key}":\s*\{{(.*?)\}}', raw_text, re.DOTALL)
-        if methods_match:
-            methods = {}
-            method_pairs = re.findall(r'"([^"]+)":\s*"([^"]+)"', methods_match.group(1))
-            for feature, method in method_pairs:
-                methods[feature] = method
-            result[method_key] = methods
-    
-    # Extract feature importance
-    importance_match = re.search(r'"feature_importance":\s*\{(.*?)\}', raw_text, re.DOTALL)
-    if importance_match:
-        importance_str = importance_match.group(1)
-        importance = {}
-        # Try to extract nested structure first
-        nested_match = re.search(r'"features":\s*\{(.*?)\}', importance_str, re.DOTALL)
-        if nested_match:
-            importance_pairs = re.findall(r'"([^"]+)":\s*([\d\.]+)', nested_match.group(1))
-            importance["features"] = {feat: float(score) for feat, score in importance_pairs}
-            # Extract target column usage flag
-            target_used_match = re.search(r'"target_column_used":\s*(true|false)', importance_str)
-            if target_used_match:
-                importance["target_column_used"] = target_used_match.group(1).lower() == "true"
-        else:
-            # Fallback to flat structure
-            importance_pairs = re.findall(r'"([^"]+)":\s*([\d\.]+)', importance_str)
-            importance = {feat: float(score) for feat, score in importance_pairs}
-        result["feature_importance"] = importance
-    
-    # Extract various analysis results
-    analysis_patterns = {
-        "high_correlation_pairs": r'\["([^"]+)",\s*"([^"]+)",\s*([\d\.]+)\]',
-        "variance_filtered_features": r'\{"feature":\s*"([^"]+)",\s*"variance":\s*([\d\.]+)\}',
-        "suggested_features_to_drop": r'\{"feature":\s*"([^"]+)",\s*"reason":\s*"([^"]+)"\}'
+    shape_patterns = {
+        "original_shape": r'"original_shape":\s*\[(\d+),\s*(\d+)\]',
+        "final_shape": r'"final_shape":\s*\[(\d+),\s*(\d+)\]'
     }
     
-    for key, pattern in analysis_patterns.items():
-        section_match = re.search(rf'"{key}":\s*\[(.*?)\]', raw_text, re.DOTALL)
-        if section_match:
-            items = []
-            matches = re.finditer(pattern, section_match.group(1))
-            for match in matches:
-                if key == "high_correlation_pairs":
-                    items.append([match.group(1), match.group(2), float(match.group(3))])
-                elif key == "variance_filtered_features":
-                    items.append({"feature": match.group(1), "variance": float(match.group(2))})
-                else:  # suggested_features_to_drop
-                    items.append({"feature": match.group(1), "reason": match.group(2)})
-            result[key] = items
+    for key, pattern in shape_patterns.items():
+        shape_match = re.search(pattern, raw_text)
+        if shape_match:
+            result[key] = [int(shape_match.group(1)), int(shape_match.group(2))]
     
-    # Extract preview data and file paths
-    for key in ["engineered_preview", "engineered_file_path", "engineered_file_name"]:
-        if key == "engineered_preview":
-            preview_match = re.search(rf'"{key}":\s*(\[.*?\])', raw_text, re.DOTALL)
-            if preview_match:
-                try:
-                    preview_str = preprocess_for_json(preview_match.group(1))
-                    result[key] = json.loads(preview_str)
-                except:
-                    pass
-        else:
-            path_match = re.search(rf'"{key}":\s*"([^"]+)"', raw_text)
-            if path_match:
-                result[key] = path_match.group(1)
+    # Extract feature lists
+    feature_patterns = {
+        "numerical_features": r'"numerical_features":\s*\[(.*?)\]',
+        "categorical_features": r'"categorical_features":\s*\[(.*?)\]'
+    }
+    
+    for key, pattern in feature_patterns.items():
+        features_match = re.search(pattern, raw_text, re.DOTALL)
+        if features_match:
+            features = re.findall(r'"([^"]+)"', features_match.group(1))
+            result[key] = features
+    
+    # Extract methods applied
+    method_patterns = {
+        "scaling_methods_applied": r'"scaling_methods_applied":\s*\{(.*?)\}',
+        "encoding_methods_applied": r'"encoding_methods_applied":\s*\{(.*?)\}'
+    }
+    
+    for key, pattern in method_patterns.items():
+        methods_match = re.search(pattern, raw_text, re.DOTALL)
+        if methods_match:
+            methods_str = methods_match.group(1)
+            methods = {}
+            method_pairs = re.findall(r'"([^"]+)":\s*"([^"]+)"', methods_str)
+            for feature, method in method_pairs:
+                methods[feature] = method
+            result[key] = methods
+    
+    # Extract engineered preview data
+    preview_match = re.search(r'"engineered_preview":\s*(\[.*?\])', raw_text, re.DOTALL)
+    if preview_match:
+        try:
+            preview_str = preprocess_for_json(preview_match.group(1))
+            result["engineered_preview"] = json.loads(preview_str)
+        except json.JSONDecodeError:
+            pass
+    
+    # Extract file paths
+    path_patterns = {
+        "engineered_file_path": r'"engineered_file_path":\s*"([^"]+)"',
+        "engineered_file_name": r'"engineered_file_name":\s*"([^"]+)"'
+    }
+    
+    for key, pattern in path_patterns.items():
+        path_match = re.search(pattern, raw_text)
+        if path_match:
+            result[key] = path_match.group(1)
     
     return result
