@@ -51,7 +51,7 @@ FeatureEngineeringTask:
   expected_output: >
     A dictionary containing feature engineering statistics and information. Return the results in a valid JSON format with the following required keys:
     - "original_shape": [rows, columns] - Shape before feature engineering
-    - "final_shape": [rows, columns] - Shape after feature engineering
+    - "final_shape": [rows, engineered_columns] - Shape after feature engineering, where engineered_columns is the total count of numerical_features + categorical_features
     - "numerical_features": [...] - List of numerical feature names
     - "categorical_features": [...] - List of categorical feature names
     - "scaling_methods_applied": {...} - Dictionary mapping numerical columns to scaling methods applied

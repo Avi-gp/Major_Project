@@ -73,11 +73,14 @@ class FeatureEngineeringTool(BaseTool):
             # Generate preview and final stats
             preview_rows = min(5, len(df))
             
+            # Calculate the actual number of engineered features
+            actual_feature_count = len(numerical_features) + len(categorical_features)
+            
             # Create result dictionary with numpy values converted to Python standard types
             result = {
                 "message": "Feature engineering completed successfully",
                 "original_shape": [int(original_shape[0]), int(original_shape[1])],
-                "final_shape": [int(df.shape[0]), int(df.shape[1])],
+                "final_shape": [int(df.shape[0]), actual_feature_count],  # Use actual feature count
                 "numerical_features": numerical_features,
                 "categorical_features": categorical_features,
                 "scaling_methods_applied": feature_engineering_stats["scaling_methods_applied"],

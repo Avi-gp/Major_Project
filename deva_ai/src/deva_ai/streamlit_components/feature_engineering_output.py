@@ -31,14 +31,14 @@ def display_feature_engineering_results(feature_engineering_data):
         # Display results
         st.markdown('<h2 class="subheader">🔧 Feature Engineering Results</h2>', unsafe_allow_html=True)
 
-        # Dataset Overview Section with cards
+        # Dataset Overview Section with cards - updated to show accurate column counts
         if "original_shape" in result and "final_shape" in result:
-            col1, col2 = st.columns([2,2])
+            col1, col2, col3 = st.columns([2,2,2])
             with col1:
                 st.markdown(
                     f"""
                     <div class="metric-card">
-                        <div class="metric-label">Preprocessed Dataset</div>
+                        <div class="metric-label">Original Dataset</div>
                         <div class="metric-value">{result["original_shape"][0]} × {result["original_shape"][1]}</div>
                         <div class="metric-label">(rows × columns)</div>
                     </div>
@@ -46,11 +46,24 @@ def display_feature_engineering_results(feature_engineering_data):
                     unsafe_allow_html=True
                 )
             with col2:
+                # Calculate actual engineered column count
+                engineered_cols = len(result.get("numerical_features", [])) + len(result.get("categorical_features", []))
                 st.markdown(
                     f"""
                     <div class="metric-card">
-                        <div class="metric-label">Engineered Dataset</div>
-                        <div class="metric-value">{result["final_shape"][0]} × {result["final_shape"][1]}</div>
+                        <div class="metric-label">Engineered Features</div>
+                        <div class="metric-value">{engineered_cols}</div>
+                        <div class="metric-label">Total Features</div>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
+                )
+            with col3:
+                st.markdown(
+                    f"""
+                    <div class="metric-card">
+                        <div class="metric-label">Final Dataset</div>
+                        <div class="metric-value">{result["final_shape"][0]} × {engineered_cols}</div>
                         <div class="metric-label">(rows × columns)</div>
                     </div>
                     """, 
