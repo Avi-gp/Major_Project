@@ -5,6 +5,7 @@ from streamlit import context
 from tools.file_handling_tool import FileHandlingTool
 from tools.data_preprocessing_tool import DataPreprocessingTool
 from tools.feature_engineering_tool import FeatureEngineeringTool
+from tools.insight_generation_tool import InsightGenerationTool
 from dotenv import load_dotenv
 import os
 import yaml
@@ -14,7 +15,7 @@ load_dotenv()
 
 # Initialize LLM with API key and model name
 llm_model_name = os.getenv('MODEL')
-api_key = os.getenv('NVIDIA_NIM_API_KEY')
+api_key = os.getenv('NVIDIA_NIM_API_KEY_1')
 
 LLM_model = LLM(
     model=llm_model_name,

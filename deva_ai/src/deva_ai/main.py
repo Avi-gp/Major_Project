@@ -4,10 +4,11 @@ import streamlit as st
 import os
 import re
 from crew import DevaAi
-from utils import save_uploadedfile , extract_data_with_regex , extract_preprocessing_info , preprocess_for_json , parse_json_safely , extract_value
+from utils import save_uploadedfile,Efile, extract_data_with_regex, extract_preprocessing_info,preprocess_for_json, parse_json_safely, extract_value  ,extract_feature_engineering_info             
 from streamlit_components.data_ingestion_output import display_data_ingestion_results
 from streamlit_components.data_preprocessing_output import display_preprocessing_results
 from streamlit_components.feature_engineering_output import display_feature_engineering_results
+from streamlit_components.insight_generation_output import display_insight_generation_results
 
 # Set the page configuration as the first Streamlit command
 st.set_page_config(page_title="DEVA AI : AI-Powered Data Analysis", layout="wide")
@@ -300,92 +301,144 @@ def main():
                         st.error("Unsupported file format. Please upload CSV or Excel file.")
                         st.stop()
 
-                    # Load the dataset for target selection
-                    try:
-                        if file_extension == '.csv':
-                            df = pd.read_csv(file_path)
-                        else:
-                            df = pd.read_excel(file_path)
+                    # Execute CrewAI if we haven't already or if we're using a new file
+                    if 'crew_results' not in st.session_state or st.session_state.get('last_file') != file_path:
+                        # Create DevaAi instance
+                        deva = DevaAi()
+                        inputs = {
+                            "file_path": file_path,
+                            "file_name": uploaded_file.name,
+                            "preprocessed_file_path": "",
+                            "preprocessed_file_name": "",
+                            "engineered_file_path": "",
+                            "engineered_file_name": "",
+                        }
+
+                        with st.spinner('Processing dataset... Please wait'):
+                            crew_output = deva.crew().kickoff(inputs=inputs)
+                            st.session_state['crew_results'] = crew_output
+                            st.session_state['last_file'] = file_path
+                    else:
+                        crew_output = st.session_state['crew_results']
+
+                    # Display CrewAI results first
+                    if hasattr(crew_output, 'tasks_output'):
+                        progress_bar = st.progress(0)
                         
-                        # Target Column Selection
-                        st.markdown('<h2 class="subheader">Select Target Variable</h2>', unsafe_allow_html=True)
+                        if len(crew_output.tasks_output) > 0:
+                            st.success("✅ Data successfully loaded and analyzed!")
+                            display_data_ingestion_results(crew_output)
+                            progress_bar.progress(50)
+                        
+                        if len(crew_output.tasks_output) > 1:
+                            display_preprocessing_results(crew_output.tasks_output[1])
+                            progress_bar.progress(75)
+                            st.success("✅ Data preprocessing completed!")
+
+                        if len(crew_output.tasks_output) > 2:
+                            display_feature_engineering_results(crew_output.tasks_output[2])
+                            progress_bar.progress(100)
+                            st.success("✅ Feature Engineering completed!")
+
+                            # Extract the raw text from feature engineering output
+                            feature_eng_info = crew_output.tasks_output[2].raw
+                            # Get engineered file info using Efile function
+                            engineered_file_path, engineered_file_name = Efile(feature_eng_info)
+
+                            if not engineered_file_path or not engineered_file_name:
+                                st.error("Failed to extract engineered file information")
+                                st.stop()
+
+                            # Store in session state for later use
+                            st.session_state['engineered_file_path'] = engineered_file_path
+                            st.session_state['engineered_file_name'] = engineered_file_name
+                        progress_bar.empty()
+                        
+                        # Target Column Selection (moved after CrewAI output)
+                        st.markdown('<h2 class="subheader">Select Target Variable for Insights</h2>', unsafe_allow_html=True)
                         st.markdown("""
                             <div class="target-section">
                                 <p class="target-info">Select the column you want to analyze as your target variable.</p>
                         """, unsafe_allow_html=True)
                         
-                        columns = df.columns.tolist()
+                        # Load engineered dataset for column selection using the file name
+                        engineered_df = pd.read_csv(engineered_file_path) if engineered_file_name.endswith('.csv') else pd.read_excel(engineered_file_path)
+                        columns = engineered_df.columns.tolist()
+                        
+                                             # Add a placeholder option as first item
+                        columns_with_placeholder = ["--Select a target column--"] + columns
+                            
+                        # Create a unique key for the selectbox to ensure it refreshes properly
+                        select_key = f"target_column_select_{engineered_file_name}"
+                        
+                        # Use selectbox with placeholder as first option
                         target_column = st.selectbox(
                             "Select the target column:",
-                            options=columns,
-                            key="target_column_select"
-                        )
-                        st.write(f"Selected target column: {target_column}")
-                        proceed_button = st.button(
-                            "Proceed with Analysis",
-                            type="primary",
-                            key="proceed_button",
-                            help="Click to start the analysis"
+                            options=columns_with_placeholder,
+                            index=0,  # Default to the placeholder
+                            key=select_key
                         )
                         
-                        st.markdown("</div>", unsafe_allow_html=True)
-                        
-                        if proceed_button:
+                        # Check if user has selected a valid column (not the placeholder)
+                        if target_column != "--Select a target column--":
                             st.session_state['target_column'] = target_column
+                            st.session_state.target_column_selected = True
                             
-                            # Only execute CrewAI if we haven't already or if we're using a new file
-                            if 'crew_results' not in st.session_state or st.session_state.get('last_file') != file_path:
-                                # Create DevaAi instance
-                                deva = DevaAi()
-                                inputs = {
-                                    "file_path": file_path,
-                                    "file_name": uploaded_file.name,
-                                    "preprocessed_file_path": "",
-                                    "preprocessed_file_name": "",
-                                    "target_column": target_column
-                                }
-
-                                with st.spinner('Processing dataset... Please wait'):
-                                    crew_output = deva.crew().kickoff(inputs=inputs)
-                                    st.session_state['crew_results'] = crew_output
-                                    st.session_state['last_file'] = file_path
+                            # Only show insights when a target is selected
+                            if st.session_state.target_column_selected:
+                                # Show progress container
+                                insight_progress = st.empty()
+                                insight_status = st.empty()
+                                
+                                with st.spinner('🔍 Generating comprehensive data insights...'):
+                                    # Initialize progress
+                                    insight_progress.progress(0)
+                                    insight_status.info('Starting insight generation...')
+                                    
+                                    try:
+                                        # Update progress at 25%
+                                        insight_progress.progress(25)
+                                        insight_status.info('Loading and preparing data...')
+                                        
+                                        # Update progress at 50%
+                                        insight_progress.progress(50)
+                                        insight_status.info('Analyzing relationships and patterns...')
+                                        
+                                        # Update progress at 75%
+                                        insight_progress.progress(75)
+                                        insight_status.info('Generating visualizations...')
+                                        
+                                        # Pass the extracted engineered file path and selected target column
+                                        display_insight_generation_results(engineered_file_path, target_column)
+                                        
+                                        # Complete progress
+                                        insight_progress.progress(100)
+                                        insight_status.success('✨ Insights generated successfully!')
+                                        
+                                        # Clear progress indicators after completion
+                                        insight_progress.empty()
+                                        
+                                    except Exception as e:
+                                        insight_status.error(f"Error during insight generation: {str(e)}")
+                                        st.exception(e)
                             else:
-                                crew_output = st.session_state['crew_results']
-
-                            # Display results
-                            if hasattr(crew_output, 'tasks_output'):
-                                progress_bar = st.progress(0)
+                                # Show a message prompting user to select a target column
+                                st.info("Please select a target column to generate insights")
                                 
-                                if len(crew_output.tasks_output) > 0:
-                                    st.success("✅ Data successfully loaded and analyzed!")
-                                    display_data_ingestion_results(crew_output)
-                                    progress_bar.progress(33)
-                                
-                                if len(crew_output.tasks_output) > 1:
-                                    display_preprocessing_results(crew_output.tasks_output[1])
-                                    progress_bar.progress(66)
-                                    st.success("✅ Data preprocessing completed!")
+                        st.markdown("""</div>""", unsafe_allow_html=True)
+                            
+                            
+                    else:
+                        st.warning("Task output not structured as expected. Displaying raw results:")
+                        try:
+                            raw_content = crew_output.raw.strip("`")
+                            raw_content = preprocess_for_json(raw_content)
+                            result = json.loads(raw_content)
+                            st.json(result)
+                        except Exception as parse_error:
+                            st.error(f"Error parsing raw output: {str(parse_error)}")
+                            st.write(crew_output.raw)
 
-                                if len(crew_output.tasks_output) > 2:
-                                    display_feature_engineering_results(crew_output.tasks_output[2])
-                                    progress_bar.progress(100)
-                                    st.success("✅ Feature Engineering completed!")
-                                
-                                progress_bar.empty()
-                            else:
-                                st.warning("Task output not structured as expected. Displaying raw results:")
-                                try:
-                                    raw_content = crew_output.raw.strip("`")
-                                    raw_content = preprocess_for_json(raw_content)
-                                    result = json.loads(raw_content)
-                                    st.json(result)
-                                except Exception as parse_error:
-                                    st.error(f"Error parsing raw output: {str(parse_error)}")
-                                    st.write(crew_output.raw)
-
-                    except Exception as e:
-                        st.error(f"Error loading dataset: {str(e)}")
-                        st.exception(e)
                 else:
                     st.error("Failed to save the uploaded file.")
 

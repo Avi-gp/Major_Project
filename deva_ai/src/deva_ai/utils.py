@@ -555,3 +555,18 @@ def extract_feature_engineering_info(raw_text):
             result[key] = path_match.group(1)
     
     return result
+
+def Efile(raw_text):
+    """Extract engineered file path and name from raw text"""
+    path_patterns = {
+        "engineered_file_path": r'"engineered_file_path":\s*"([^"]+)"',
+        "engineered_file_name": r'"engineered_file_name":\s*"([^"]+)"'
+    }
+
+    result_p = {}
+    for key, pattern in path_patterns.items():
+        path_match = re.search(pattern, raw_text)
+        if path_match:
+            result_p[key] = path_match.group(1)
+            
+    return result_p.get("engineered_file_path"), result_p.get("engineered_file_name")
