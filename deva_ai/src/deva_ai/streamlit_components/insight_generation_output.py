@@ -83,8 +83,26 @@ def display_insight_generation_results(file_path, target_column):
         # Separate numerical and categorical columns
         numerical_cols, categorical_cols = identify_feature_types(df)
        
-        st.write("Numerical Columns Identified:",numerical_cols)
-        st.write("Categorical Columns Identified",categorical_cols)
+        st.markdown("## Column Type Classification")
+        st.text("Columns are classified based on thier types and no of unique values.")
+        col_info = pd.DataFrame({
+            'Data Type': ['Numerical', 'Categorical'],
+            'Count': [len(numerical_cols), len(categorical_cols)]
+        })
+        st.dataframe(col_info.style.set_properties(**{'padding': '10px'}))
+
+        # Display column names in expandable sections for better visibility
+        if numerical_cols:
+            with st.expander("📊 View all Numerical Columns"):
+                # Display numerical columns in a more readable format
+                num_cols_df = pd.DataFrame({'Numerical Columns': numerical_cols})
+                st.dataframe(num_cols_df, height=min(35 * len(numerical_cols) + 38, 300))
+
+        if categorical_cols:
+            with st.expander("📋 View all Categorical Columns"):
+                # Display categorical columns in a more readable format
+                cat_cols_df = pd.DataFrame({'Categorical Columns': categorical_cols})
+                st.dataframe(cat_cols_df, height=min(35 * len(categorical_cols) + 38, 300))
         
         # Exclude target from features if it exists in either list
         if target_column in numerical_cols:
@@ -101,6 +119,11 @@ def display_insight_generation_results(file_path, target_column):
             feature_cat_cols = categorical_cols
             target_is_categorical = False
 
+        st.markdown("<div style='padding: 20px 0px;'></div>", unsafe_allow_html=True)
+        st.markdown("## 📈 Interactive Data Analysis")
+        st.markdown("Explore your dataset through different analytical perspectives using the tabs below.")
+        st.markdown("<div style='padding: 10px 0px;'></div>", unsafe_allow_html=True)
+
         # Create tabs for different analyses
         tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
             "📊 Univariate", "🔄 Bivariate", "📋 Categorical",
@@ -113,10 +136,10 @@ def display_insight_generation_results(file_path, target_column):
             st.markdown('<div', unsafe_allow_html=True)
             st.markdown("### Distribution Of Numerical Features")
             
-            # Show all numerical distributions
+            # Show top 15 numerical distributions
             if len(feature_num_cols) > 0:
-                # Limit to first 20 numerical columns if there are too many
-                display_num_cols = feature_num_cols[:20]
+                # Limit to first 15 numerical columns if there are too many
+                display_num_cols = feature_num_cols[:15]
                 # Calculate optimal grid dimensions
                 n_cols = 3
                 n_rows = (len(display_num_cols) + n_cols - 1) // n_cols
@@ -141,18 +164,21 @@ def display_insight_generation_results(file_path, target_column):
                 st.pyplot(fig)
                 plt.close()
             
-            # Show all categorical distributions
+            # Show top 15 categorical distributions
             if len(feature_cat_cols) > 0:
                 st.markdown("### Distribution of Categorical Features")
                 
+                # Limit to first 15 categorical columns
+                display_cat_cols = feature_cat_cols[:15]
+                
                 # Calculate optimal figure height based on number of categories
-                total_categories = sum(df[col].nunique() for col in feature_cat_cols)
-                fig_height = max(4 * len(feature_cat_cols), total_categories * 0.4)
+                total_categories = sum(df[col].nunique() for col in display_cat_cols)
+                fig_height = max(4 * len(display_cat_cols), total_categories * 0.4)
                 
                 fig = plt.figure(figsize=(20, fig_height))
                 
-                for i, col in enumerate(feature_cat_cols):
-                    ax = fig.add_subplot(len(feature_cat_cols), 1, i+1)
+                for i, col in enumerate(display_cat_cols):
+                    ax = fig.add_subplot(len(display_cat_cols), 1, i+1)
                     
                     # Get value counts and sort them
                     value_counts = df[col].value_counts().sort_index()
@@ -160,8 +186,10 @@ def display_insight_generation_results(file_path, target_column):
                     # Create bar plot with actual values
                     sns.barplot(x=value_counts.index.astype(str), 
                               y=value_counts.values,
+                              hue=value_counts.index.astype(str),
                               ax=ax, 
-                              palette=sns.color_palette("viridis", n_colors=len(value_counts)))
+                              palette="viridis",
+                              legend=False)
                     
                     # Add percentage labels on top of bars
                     total = value_counts.sum()
@@ -183,6 +211,9 @@ def display_insight_generation_results(file_path, target_column):
             if len(feature_num_cols) > 0:
                 st.markdown("### Box Plots of Numerical Features")
                 
+                # Limit to first 15 numerical columns
+                display_num_cols = feature_num_cols[:15]
+                
                 # Calculate optimal grid dimensions
                 n_cols = 3
                 n_rows = (len(display_num_cols) + n_cols - 1) // n_cols
@@ -194,54 +225,86 @@ def display_insight_generation_results(file_path, target_column):
                 for i, num_col in enumerate(display_num_cols):
                     ax = fig.add_subplot(gs[i//n_cols, i%n_cols])
                     sns.boxplot(data=df, y=num_col, ax=ax, color=colors[i % len(colors)], width=0.5)
-                    ax.set_title(f'Box Plot of {col}', fontsize=12, fontweight='bold')
+                    ax.set_title(f'Box Plot of {num_col}', fontsize=12, fontweight='bold')
                     ax.grid(True, alpha=0.3, axis='y')
                 
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close()
 
-            # Box plots for categorical columns
+            # Box plots for categorical columns with user selection (limit of 5 categorical columns)
             if len(feature_cat_cols) > 0:
                 st.markdown("### Box Plots with Categorical Features")
                 
-                # Select numerical columns to plot against categorical features
-                # Using top numerical columns based on their correlation with target if available
-                if target_is_numeric and len(feature_num_cols) > 0:
-                    num_cols_for_boxplot = df[feature_num_cols].corrwith(df[target_column]).abs().sort_values(ascending=False).head(5).index.tolist()
-                else:
-                    num_cols_for_boxplot = feature_num_cols[:5] if len(feature_num_cols) >= 5 else feature_num_cols
+                # Filter categorical columns with reasonable number of categories to avoid overcrowding
+                filtered_cat_cols = [col for col in feature_cat_cols if df[col].nunique() <= 10]
                 
-                # Select categorical columns with reasonable number of categories to avoid overcrowding
-                cat_cols_for_boxplot = [col for col in feature_cat_cols if df[col].nunique() <= 10][:3]
-                
-                if len(num_cols_for_boxplot) > 0 and len(cat_cols_for_boxplot) > 0:
-                    for num_col in num_cols_for_boxplot:
-                        fig = plt.figure(figsize=(18, 5 * len(cat_cols_for_boxplot)))
-                        
-                        for i, cat_col in enumerate(cat_cols_for_boxplot):
-                            ax = fig.add_subplot(len(cat_cols_for_boxplot), 1, i+1)
+                if len(filtered_cat_cols) > 0 and len(feature_num_cols) > 0:
+                    # Let user select categorical columns (limit to 5)
+                    selected_cat_cols = st.multiselect(
+                        "Select categorical columns (max 5):",
+                        options=filtered_cat_cols,
+                        default=filtered_cat_cols[:1] if filtered_cat_cols else [],
+                        max_selections=5
+                    )
+                    
+                    # Let user select numerical columns (limit to 5)
+                    if target_is_numeric and len(feature_num_cols) > 0:
+                        # Get correlations to show most relevant numerical columns by default
+                        corr_with_target = df[feature_num_cols].corrwith(df[target_column]).abs().sort_values(ascending=False)
+                        default_num_cols = corr_with_target.head(2).index.tolist()
+                    else:
+                        default_num_cols = feature_num_cols[:2] if len(feature_num_cols) >= 2 else feature_num_cols
+                    
+                    selected_num_cols = st.multiselect(
+                        "Select numerical columns (max 5):",
+                        options=feature_num_cols,
+                        default=default_num_cols,
+                        max_selections=5
+                    )
+                    
+                    # Ensure we don't exceed total of 15 box plots
+                    total_plots = len(selected_num_cols) * len(selected_cat_cols)
+                    if total_plots > 15:
+                        st.warning(f"Selected combinations would create {total_plots} plots. Limiting to 15 plots.")
+                        # Determine how many numerical columns to use
+                        max_num_cols = min(len(selected_num_cols), 15 // max(1, len(selected_cat_cols)))
+                        selected_num_cols = selected_num_cols[:max_num_cols]
+                    
+                    if selected_num_cols and selected_cat_cols:
+                        for num_col in selected_num_cols:
+                            fig = plt.figure(figsize=(18, 5 * len(selected_cat_cols)))
                             
-                            # Create box plot with categorical column on x-axis and numerical column on y-axis
-                            sns.boxplot(data=df, x=cat_col, y=num_col, hue=cat_col, ax=ax, palette='viridis', legend=False)
+                            for i, cat_col in enumerate(selected_cat_cols):
+                                ax = fig.add_subplot(len(selected_cat_cols), 1, i+1)
+                                
+                                # Create box plot with categorical column on x-axis and numerical column on y-axis
+                                sns.boxplot(data=df, x=cat_col, y=num_col, hue=cat_col, ax=ax, palette='viridis', legend=False)
+                                
+                                ax.set_title(f'Box Plot of {num_col} by {cat_col}', fontsize=14, fontweight='bold')
+                                ax.set_xlabel(cat_col, fontsize=12)
+                                ax.set_ylabel(num_col, fontsize=12)
+                                plt.xticks(rotation=45, ha='right')
+                                ax.grid(True, alpha=0.3, axis='y')
                             
-                            ax.set_title(f'Box Plot of {num_col} by {cat_col}', fontsize=14, fontweight='bold')
-                            ax.set_xlabel(cat_col, fontsize=12)
-                            ax.set_ylabel(num_col, fontsize=12)
-                            plt.xticks(rotation=45, ha='right')
-                            ax.grid(True, alpha=0.3, axis='y')
-                        
-                        plt.tight_layout()
-                        st.pyplot(fig)
-                        plt.close()
-                elif len(cat_cols_for_boxplot) == 0:
+                            plt.tight_layout()
+                            st.pyplot(fig)
+                            plt.close()
+                    elif not selected_cat_cols:
+                        st.info("Please select at least one categorical column.")
+                    elif not selected_num_cols:
+                        st.info("Please select at least one numerical column.")
+                elif len(filtered_cat_cols) == 0:
                     st.info("No suitable categorical columns found for box plots (limited to categories with 10 or fewer unique values).")
-                elif len(num_cols_for_boxplot) == 0:
+                elif len(feature_num_cols) == 0:
                     st.info("No numerical columns available for creating box plots with categorical features.")
+            else:
+                st.info("No categorical columns found in the dataset.")
+
 
         # 2. Bivariate Analysis Tab
         with tab2:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
             
             # Time Series Analysis (New Section)
             # Check if any datetime columns exist
@@ -327,55 +390,69 @@ def display_insight_generation_results(file_path, target_column):
                     
                     st.plotly_chart(fig, use_container_width=True)
             
-            # Original Bivariate Scatter Plots
+            # Modified approach with user selection
             if len(feature_num_cols) >= 2:
                 st.markdown("### Relationships Between Numerical Features")
                 
-                # Select top 10 numerical features based on correlation with target
-                if len(feature_num_cols) > 10:
-                    if target_is_numeric:
-                        correlations = abs(df[feature_num_cols].corrwith(df[target_column]))
-                        top_features = correlations.nlargest(10).index.tolist()
-                    else:
-                        top_features = feature_num_cols[:10]
+                # Select default features based on correlation with target
+                if target_is_numeric:
+                    correlations = abs(df[feature_num_cols].corrwith(df[target_column]))
+                    default_features = correlations.nlargest(min(5, len(correlations))).index.tolist()
                 else:
-                    top_features = feature_num_cols
+                    default_features = feature_num_cols[:min(5, len(feature_num_cols))]
                 
-                # Create scatter plots for selected numerical pairs
-                pairs = [(i, j) for i in range(len(top_features)) 
-                        for j in range(i+1, len(top_features))]
+                # Allow user to select features (with defaults pre-selected)
+                selected_features = st.multiselect(
+                    "Select numerical features for scatter plot analysis (2-6 recommended):",
+                    options=feature_num_cols,
+                    default=default_features[:min(3, len(default_features))]
+                )
                 
-                n_cols = 2
-                n_rows = (len(pairs) + n_cols - 1) // n_cols
-                
-                fig = plt.figure(figsize=(20, 6 * n_rows))
-                
-                # Custom color palette for scatter plots
-                scatter_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD']
-                
-                for idx, (i, j) in enumerate(pairs):
-                    ax = fig.add_subplot(n_rows, n_cols, idx + 1)
-                    col1, col2 = top_features[i], top_features[j]
+                # Create scatter plots only if 2+ features are selected
+                if len(selected_features) >= 2:
+                    # Create scatter plots for selected numerical pairs
+                    pairs = [(i, j) for i in range(len(selected_features)) 
+                            for j in range(i+1, len(selected_features))]
                     
-                    # Calculate correlation
-                    corr = df[col1].corr(df[col2])
+                    # Show warning if too many plots will be generated
+                    if len(pairs) > 15:
+                        st.warning(f"Your selection will generate {len(pairs)} scatter plots. Consider selecting fewer features for better visualization.")
                     
-                    # Create scatter plot with custom colors
-                    sns.scatterplot(data=df, x=col1, y=col2,
-                                color=scatter_colors[idx % len(scatter_colors)],
-                                alpha=0.6, ax=ax)
+                    n_cols = 2
+                    n_rows = (len(pairs) + n_cols - 1) // n_cols
                     
-                    ax.set_title(f'{col1} vs {col2}\n(r={corr:.2f})', 
-                            fontsize=12, fontweight='bold')
-                    ax.grid(True, alpha=0.3)
-                
-                plt.tight_layout()
-                st.pyplot(fig)
-                plt.close()
+                    fig = plt.figure(figsize=(20, 6 * n_rows))
+                    
+                    # Custom color palette for scatter plots
+                    scatter_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD']
+                    
+                    for idx, (i, j) in enumerate(pairs):
+                        ax = fig.add_subplot(n_rows, n_cols, idx + 1)
+                        col1, col2 = selected_features[i], selected_features[j]
+                        
+                        # Calculate correlation
+                        corr = df[col1].corr(df[col2])
+                        
+                        # Create scatter plot with custom colors
+                        sns.scatterplot(data=df, x=col1, y=col2,
+                                    color=scatter_colors[idx % len(scatter_colors)],
+                                    alpha=0.6, ax=ax)
+                        
+                        ax.set_title(f'{col1} vs {col2}\n(r={corr:.2f})', 
+                                fontsize=12, fontweight='bold')
+                        ax.grid(True, alpha=0.3)
+                    
+                    plt.tight_layout()
+                    st.pyplot(fig)
+                    plt.close()
+                elif len(selected_features) == 1:
+                    st.info("Please select at least one more feature to create scatter plots.")
+                else:
+                    st.info("Please select features to visualize relationships.")
 
         # 3. Categorical Analysis Tab
         with tab3:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
             if len(feature_cat_cols) > 0:
                 st.markdown("### Categorical Analysis")
                 
@@ -388,8 +465,8 @@ def display_insight_generation_results(file_path, target_column):
                 })
                 st.dataframe(categorical_summary)
                 
-                # Automatically display visualizations for up to 20 categorical columns
-                display_cat_cols = feature_cat_cols[:min(20, len(feature_cat_cols))]
+                # Automatically display visualizations for up to 15 categorical columns
+                display_cat_cols = feature_cat_cols[:min(15, len(feature_cat_cols))]
                 
                 if display_cat_cols:
                     st.markdown("### Categorical Distributions")
@@ -414,111 +491,189 @@ def display_insight_generation_results(file_path, target_column):
                                     fig.update_layout(height=350, margin=dict(t=50, b=20, l=20, r=20))
                                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Categorical relationships - modified to select just 1 column
-                    # and use all other columns for the relationship analysis
+                    # Categorical relationships - modified to allow selection of both primary and secondary columns
                     st.markdown("### Categorical Relationships")
-                    
+
                     # Filter columns with 15 or fewer unique values
                     cat_cols_for_relationship = [col for col in display_cat_cols if df[col].nunique() <= 15]
-                    
+
                     if len(cat_cols_for_relationship) >= 2:
                         # Initialize session state for relationship analysis
                         if 'relationship_analysis_state' not in st.session_state:
                             st.session_state.relationship_analysis_state = {
-                                'primary_col': cat_cols_for_relationship[0]
+                                'primary_col': cat_cols_for_relationship[0],
+                                'secondary_col': cat_cols_for_relationship[1] if len(cat_cols_for_relationship) > 1 else None
                             }
 
-                        # Create selectbox for the primary column
-                        selected_primary_col = st.selectbox(
-                            "Select primary categorical column:", 
-                            options=cat_cols_for_relationship,
-                            key="primary_cat_col_selectbox",
-                            index=cat_cols_for_relationship.index(st.session_state.relationship_analysis_state['primary_col']) 
+                        # Create two columns for the selection widgets
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            # Create selectbox for the primary column
+                            selected_primary_col = st.selectbox(
+                                "Select primary categorical column:", 
+                                options=cat_cols_for_relationship,
+                                key="primary_cat_col_selectbox",
+                                index=cat_cols_for_relationship.index(st.session_state.relationship_analysis_state['primary_col']) 
                                     if st.session_state.relationship_analysis_state['primary_col'] in cat_cols_for_relationship else 0
-                        )
+                            )
+                        
+                        # Update secondary column options (excluding the primary column)
+                        secondary_options = [col for col in cat_cols_for_relationship if col != selected_primary_col]
+                        
+                        with col2:
+                            # Create selectbox for the secondary column
+                            selected_secondary_col = st.selectbox(
+                                "Select secondary categorical column:",
+                                options=secondary_options,
+                                key="secondary_cat_col_selectbox",
+                                index=secondary_options.index(st.session_state.relationship_analysis_state['secondary_col']) 
+                                    if st.session_state.relationship_analysis_state['secondary_col'] in secondary_options else 0
+                            )
 
                         # Update session state
                         st.session_state.relationship_analysis_state['primary_col'] = selected_primary_col
+                        st.session_state.relationship_analysis_state['secondary_col'] = selected_secondary_col
 
-                        # Get all other categorical columns (excluding the primary one)
-                        secondary_cols = [col for col in cat_cols_for_relationship if col != selected_primary_col]
-                        
-                        # Limit to 5 secondary columns to prevent too many visualizations
-                        secondary_cols = secondary_cols[:10]
-                        
-                        if secondary_cols:
-                            for secondary_col in secondary_cols:
-                                st.subheader(f"Relationship: {selected_primary_col} vs {secondary_col}")
-                                
-                                # Create contingency table for stacked bar chart
-                                contingency_table = pd.crosstab(
-                                    df[selected_primary_col], 
-                                    df[secondary_col], 
-                                    normalize='index'
-                                )
-
-                                # Create stacked bar chart
-                                fig = px.bar(
-                                    contingency_table, 
-                                    title=f'Relationship between {selected_primary_col} and {secondary_col}',
-                                    barmode='stack',
-                                    height=500
-                                )
-                                
-                                # Improve layout
-                                fig.update_layout(
-                                    xaxis_title=selected_primary_col,
-                                    yaxis_title="Proportion",
-                                    legend_title=secondary_col
-                                )
-                                
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Also add a heatmap view of the relationship
-                                st.subheader(f"Heatmap: {selected_primary_col} vs {secondary_col}")
-                                
-                                # Create count contingency table (not normalized)
-                                count_contingency = pd.crosstab(
-                                    df[selected_primary_col], 
-                                    df[secondary_col]
-                                )
-                                
-                                # Create heatmap
-                                fig = px.imshow(
-                                    count_contingency,
-                                    labels=dict(x=secondary_col, y=selected_primary_col, color="Count"),
-                                    x=count_contingency.columns,
-                                    y=count_contingency.index,
-                                    color_continuous_scale="Viridis",
-                                    aspect="auto"
-                                )
-                                
-                                # Add count values as text annotations
-                                annotations = []
-                                for i, row in enumerate(count_contingency.index):
-                                    for j, col in enumerate(count_contingency.columns):
-                                        annotations.append(
-                                            dict(
-                                                x=j,
-                                                y=i,
-                                                text=str(count_contingency.iloc[i, j]),
-                                                font=dict(color='white' if count_contingency.iloc[i, j] > count_contingency.values.mean() else 'black'),
-                                                showarrow=False
-                                            )
+                        if selected_primary_col and selected_secondary_col:
+                            st.subheader(f"Relationship: {selected_primary_col} vs {selected_secondary_col}")
+                            
+                            # Create contingency table for stacked bar chart
+                            contingency_table = pd.crosstab(
+                                df[selected_primary_col], 
+                                df[selected_secondary_col], 
+                                normalize='index'
+                            )
+                            
+                            # Create stacked bar chart
+                            fig = px.bar(
+                                contingency_table, 
+                                title=f'Relationship between {selected_primary_col} and {selected_secondary_col}',
+                                barmode='stack',
+                                height=500
+                            )
+                            
+                            # Improve layout
+                            fig.update_layout(
+                                xaxis_title=selected_primary_col,
+                                yaxis_title="Proportion",
+                                legend_title=selected_secondary_col
+                            )
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Also add a heatmap view of the relationship
+                            st.subheader(f"Heatmap: {selected_primary_col} vs {selected_secondary_col}")
+                            
+                            # Create count contingency table (not normalized)
+                            count_contingency = pd.crosstab(
+                                df[selected_primary_col], 
+                                df[selected_secondary_col]
+                            )
+                            
+                            # Create heatmap
+                            fig = px.imshow(
+                                count_contingency,
+                                labels=dict(x=selected_secondary_col, y=selected_primary_col, color="Count"),
+                                x=count_contingency.columns,
+                                y=count_contingency.index,
+                                color_continuous_scale="Viridis",
+                                aspect="auto"
+                            )
+                            
+                            # Add count values as text annotations
+                            annotations = []
+                            for i, row in enumerate(count_contingency.index):
+                                for j, col in enumerate(count_contingency.columns):
+                                    annotations.append(
+                                        dict(
+                                            x=j,
+                                            y=i,
+                                            text=str(count_contingency.iloc[i, j]),
+                                            font=dict(color='white' if count_contingency.iloc[i, j] > count_contingency.values.mean() else 'black'),
+                                            showarrow=False
                                         )
-                                fig.update_layout(annotations=annotations)
+                                    )
+                            fig.update_layout(annotations=annotations)
+                            
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Add option to view multiple relationships
+                            st.markdown("### Additional Relationships")
+                            show_more = st.checkbox("Show relationships with other categorical variables")
+                            
+                            if show_more:
+                                # Let user select additional secondary columns
+                                additional_secondary_cols = st.multiselect(
+                                    f"Select additional categorical variables to compare with {selected_primary_col}:",
+                                    [col for col in secondary_options if col != selected_secondary_col],
+                                    default=[]
+                                )
                                 
-                                st.plotly_chart(fig, use_container_width=True)
+                                for secondary_col in additional_secondary_cols:
+                                    st.subheader(f"Relationship: {selected_primary_col} vs {secondary_col}")
+                                    
+                                    # Create contingency table for stacked bar chart
+                                    contingency_table = pd.crosstab(
+                                        df[selected_primary_col], 
+                                        df[secondary_col], 
+                                        normalize='index'
+                                    )
+
+                                    # Create stacked bar chart
+                                    fig = px.bar(
+                                        contingency_table, 
+                                        title=f'Relationship between {selected_primary_col} and {secondary_col}',
+                                        barmode='stack',
+                                        height=500
+                                    )
+                                    
+                                    # Improve layout
+                                    fig.update_layout(
+                                        xaxis_title=selected_primary_col,
+                                        yaxis_title="Proportion",
+                                        legend_title=secondary_col
+                                    )
+                                    
+                                    st.plotly_chart(fig, use_container_width=True)
+                                    
+                                    # Add heatmap
+                                    count_contingency = pd.crosstab(
+                                        df[selected_primary_col], 
+                                        df[secondary_col]
+                                    )
+                                    
+                                    fig = px.imshow(
+                                        count_contingency,
+                                        labels=dict(x=secondary_col, y=selected_primary_col, color="Count"),
+                                        x=count_contingency.columns,
+                                        y=count_contingency.index,
+                                        color_continuous_scale="Viridis",
+                                        aspect="auto"
+                                    )
+                                    
+                                    # Add count values as text annotations
+                                    annotations = []
+                                    for i, row in enumerate(count_contingency.index):
+                                        for j, col in enumerate(count_contingency.columns):
+                                            annotations.append(
+                                                dict(
+                                                    x=j,
+                                                    y=i,
+                                                    text=str(count_contingency.iloc[i, j]),
+                                                    font=dict(color='white' if count_contingency.iloc[i, j] > count_contingency.values.mean() else 'black'),
+                                                    showarrow=False
+                                                )
+                                            )
+                                    fig.update_layout(annotations=annotations)
+                                    
+                                    st.plotly_chart(fig, use_container_width=True)
                     else:
                         st.info("Need at least 2 categorical columns with 15 or fewer unique values to analyze relationships.")
-            else:
-                st.info("No categorical columns found in the dataset.")
-                
-            st.markdown('</div>', unsafe_allow_html=True)
 
         # 4. Correlation Analysis Tab
         with tab4:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
             if len(numerical_cols) > 1:
                 st.markdown("### Correlation Matrix")
                 
@@ -595,7 +750,7 @@ def display_insight_generation_results(file_path, target_column):
 
         # 5. Feature Importance Analysis Tab
         with tab5:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
             st.markdown("### Feature Importance Analysis")
             
             try:
@@ -674,7 +829,7 @@ def display_insight_generation_results(file_path, target_column):
 
         # 6. Target-Based Analysis Tab
         with tab6:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
             st.markdown(f"### Analysis of Target Variable: {target_column}")
             
             if target_is_numeric:
@@ -806,7 +961,7 @@ def display_insight_generation_results(file_path, target_column):
 
         # 7. AI Insights Tab
         with tab7:
-            st.markdown('<div class="card">', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
             st.markdown("### AI-Powered Dataset Insights")
             
             try:

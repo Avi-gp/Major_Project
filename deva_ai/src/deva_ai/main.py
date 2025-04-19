@@ -16,9 +16,19 @@ st.set_page_config(page_title="DEVA AI : AI-Powered Data Analysis", layout="wide
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
+# Add session state variables for tracking process status
+if "file_uploaded" not in st.session_state:
+    st.session_state.file_uploaded = False
+    
+if "crew_executed" not in st.session_state:
+    st.session_state.crew_executed = False
+    
+if "target_column_selected" not in st.session_state:
+    st.session_state.target_column_selected = False
+
 #-----------------------------------------------------------------------------------------------#
 def main():
-    # Custom CSS for styling - optimized for dark theme
+    # Custom CSS styling remains the same
     st.markdown("""
         <style>
             @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
@@ -231,6 +241,49 @@ def main():
                 transform: translateY(-2px) !important;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
             }
+            
+            .analyze-button {
+                background: linear-gradient(135deg, #4CAF50, #45a049) !important;
+                color: white !important;
+                padding: 16px 32px !important;
+                font-size: 18px !important;
+                font-weight: bold !important;
+                border-radius: 10px !important;
+                margin: 20px 0 !important;
+                border: none !important;
+                box-shadow: 0 6px 12px rgba(0,0,0,0.2) !important;
+                transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
+                display: block !important;
+                width: 100% !important;
+                text-align: center !important;
+                position: relative !important;
+                overflow: hidden !important;
+                text-transform: uppercase !important;
+                letter-spacing: 1px !important;
+            }
+
+            .analyze-button:hover {
+                background: linear-gradient(135deg, #45a049, #3d8b3d) !important;
+                box-shadow: 0 8px 16px rgba(0,0,0,0.3) !important;
+                transform: translateY(-3px) !important;
+                letter-spacing: 1.5px !important;
+            }
+
+            .analyze-button:active {
+                transform: translateY(1px) !important;
+                box-shadow: 0 3px 8px rgba(0,0,0,0.2) !important;
+            }
+
+            /* Add a subtle animation when the button is clicked */
+            .analyze-button:focus {
+                animation: pulse 0.5s ease-in-out;
+            }
+
+            @keyframes pulse {
+                0% { transform: scale(1); }
+                50% { transform: scale(0.97); }
+                100% { transform: scale(1); }
+            }
                 
             
         </style>
@@ -246,7 +299,6 @@ def main():
             st.session_state.page = "About"
         if st.button("❓ Help"):
             st.session_state.page = "Help"
-        #page = st.radio("Navigations", ["Home", "About", "Help"])
         
         st.markdown("---")
         st.markdown("### Contact")
@@ -254,7 +306,6 @@ def main():
         st.markdown("🌐 www.devaai.com")
 
     page = st.session_state.page
-
 
     # Main content based on selected page
     if page == "Home":
@@ -294,150 +345,163 @@ def main():
                 
                 if file_path:
                     st.success(f"File successfully saved at: {file_path}")
+                    st.session_state.file_uploaded = True
+                    st.session_state['file_path'] = file_path
+                    st.session_state['uploaded_file_name'] = uploaded_file.name
                     
                     # Check file extension
                     file_extension = os.path.splitext(uploaded_file.name)[1].lower()
                     if file_extension not in ['.csv', '.xlsx']:
                         st.error("Unsupported file format. Please upload CSV or Excel file.")
                         st.stop()
+                    
+                    # Add analyze button after file is uploaded
+                    if st.button("✨ Unleash AI Analysis", key="analyze_button", help="Let our AI reveal insights hidden in your data"):
+                        # This button click will trigger the CrewAI execution
+                        if not st.session_state.get('crew_executed', False):
+                            # Create DevaAi instance
+                            deva = DevaAi()
+                            inputs = {
+                                "file_path": file_path,
+                                "file_name": uploaded_file.name,
+                                "preprocessed_file_path": "",
+                                "preprocessed_file_name": "",
+                                "engineered_file_path": "",
+                                "engineered_file_name": "",
+                            }
 
-                    # Execute CrewAI if we haven't already or if we're using a new file
-                    if 'crew_results' not in st.session_state or st.session_state.get('last_file') != file_path:
-                        # Create DevaAi instance
-                        deva = DevaAi()
-                        inputs = {
-                            "file_path": file_path,
-                            "file_name": uploaded_file.name,
-                            "preprocessed_file_path": "",
-                            "preprocessed_file_name": "",
-                            "engineered_file_path": "",
-                            "engineered_file_name": "",
-                        }
-
-                        with st.spinner('Processing dataset... Please wait'):
-                            crew_output = deva.crew().kickoff(inputs=inputs)
-                            st.session_state['crew_results'] = crew_output
-                            st.session_state['last_file'] = file_path
-                    else:
-                        crew_output = st.session_state['crew_results']
-
-                    # Display CrewAI results first
-                    if hasattr(crew_output, 'tasks_output'):
-                        progress_bar = st.progress(0)
-                        
-                        if len(crew_output.tasks_output) > 0:
-                            st.success("✅ Data successfully loaded and analyzed!")
-                            display_data_ingestion_results(crew_output)
-                            progress_bar.progress(50)
-                        
-                        if len(crew_output.tasks_output) > 1:
-                            display_preprocessing_results(crew_output.tasks_output[1])
-                            progress_bar.progress(75)
-                            st.success("✅ Data preprocessing completed!")
-
-                        if len(crew_output.tasks_output) > 2:
-                            display_feature_engineering_results(crew_output.tasks_output[2])
-                            progress_bar.progress(100)
-                            st.success("✅ Feature Engineering completed!")
-
-                            # Extract the raw text from feature engineering output
-                            feature_eng_info = crew_output.tasks_output[2].raw
-                            # Get engineered file info using Efile function
-                            engineered_file_path, engineered_file_name = Efile(feature_eng_info)
-
-                            if not engineered_file_path or not engineered_file_name:
-                                st.error("Failed to extract engineered file information")
-                                st.stop()
-
-                            # Store in session state for later use
-                            st.session_state['engineered_file_path'] = engineered_file_path
-                            st.session_state['engineered_file_name'] = engineered_file_name
-                        progress_bar.empty()
-                        
-                        # Target Column Selection (moved after CrewAI output)
-                        st.markdown('<h2 class="subheader">Select Target Variable for Insights</h2>', unsafe_allow_html=True)
-                        st.markdown("""
-                            <div class="target-section">
-                                <p class="target-info">Select the column you want to analyze as your target variable.</p>
-                        """, unsafe_allow_html=True)
-                        
-                        # Load engineered dataset for column selection using the file name
-                        engineered_df = pd.read_csv(engineered_file_path) if engineered_file_name.endswith('.csv') else pd.read_excel(engineered_file_path)
-                        columns = engineered_df.columns.tolist()
-                        
-                                             # Add a placeholder option as first item
-                        columns_with_placeholder = ["--Select a target column--"] + columns
-                            
-                        # Create a unique key for the selectbox to ensure it refreshes properly
-                        select_key = f"target_column_select_{engineered_file_name}"
-                        
-                        # Use selectbox with placeholder as first option
-                        target_column = st.selectbox(
-                            "Select the target column:",
-                            options=columns_with_placeholder,
-                            index=0,  # Default to the placeholder
-                            key=select_key
-                        )
-                        
-                        # Check if user has selected a valid column (not the placeholder)
-                        if target_column != "--Select a target column--":
-                            st.session_state['target_column'] = target_column
-                            st.session_state.target_column_selected = True
-                            
-                            # Only show insights when a target is selected
-                            if st.session_state.target_column_selected:
-                                # Show progress container
-                                insight_progress = st.empty()
-                                insight_status = st.empty()
+                            with st.spinner('Processing dataset... Please wait'):
+                                crew_output = deva.crew().kickoff(inputs=inputs)
+                                st.session_state['crew_results'] = crew_output
+                                st.session_state['last_file'] = file_path
+                                st.session_state.crew_executed = True
                                 
-                                with st.spinner('🔍 Generating comprehensive data insights...'):
-                                    # Initialize progress
-                                    insight_progress.progress(0)
-                                    insight_status.info('Starting insight generation...')
+                            st.rerun()
+                    
+                    # Display CrewAI results if already executed
+                    if st.session_state.get('crew_executed', False) and 'crew_results' in st.session_state:
+                        crew_output = st.session_state['crew_results']
+                        
+                        # Display CrewAI results
+                        if hasattr(crew_output, 'tasks_output'):
+                            progress_bar = st.progress(0)
+                            
+                            if len(crew_output.tasks_output) > 0:
+                                st.success("✅ Data successfully loaded and analyzed!")
+                                display_data_ingestion_results(crew_output)
+                                progress_bar.progress(50)
+                            
+                            if len(crew_output.tasks_output) > 1:
+                                display_preprocessing_results(crew_output.tasks_output[1])
+                                progress_bar.progress(75)
+                                st.success("✅ Data preprocessing completed!")
+
+                            if len(crew_output.tasks_output) > 2:
+                                display_feature_engineering_results(crew_output.tasks_output[2])
+                                progress_bar.progress(100)
+                                st.success("✅ Feature Engineering completed!")
+
+                                # Extract the raw text from feature engineering output
+                                feature_eng_info = crew_output.tasks_output[2].raw
+                                # Get engineered file info using Efile function
+                                engineered_file_path, engineered_file_name = Efile(feature_eng_info)
+
+                                if not engineered_file_path or not engineered_file_name:
+                                    st.error("Failed to extract engineered file information")
+                                    st.stop()
+
+                                # Store in session state for later use
+                                st.session_state['engineered_file_path'] = engineered_file_path
+                                st.session_state['engineered_file_name'] = engineered_file_name
+                            progress_bar.empty()
+                            
+                            # Target Column Selection (moved after CrewAI output)
+                            st.markdown('<h2 class="subheader">Select Target Variable for Insights</h2>', unsafe_allow_html=True)
+                            st.markdown("""
+                                <div class="target-section">
+                                    <p class="target-info">Select the column you want to analyze as your target variable.</p>
+                            """, unsafe_allow_html=True)
+                            
+                            # Load engineered dataset for column selection using the file name
+                            engineered_file_path = st.session_state.get('engineered_file_path')
+                            engineered_file_name = st.session_state.get('engineered_file_name')
+                            
+                            engineered_df = pd.read_csv(engineered_file_path) if engineered_file_name.endswith('.csv') else pd.read_excel(engineered_file_path)
+                            columns = engineered_df.columns.tolist()
+                            
+                            # Add a placeholder option as first item
+                            columns_with_placeholder = ["--Select a target column--"] + columns
+                                
+                            # Create a unique key for the selectbox to ensure it refreshes properly
+                            select_key = f"target_column_select_{engineered_file_name}"
+                            
+                            # Use selectbox with placeholder as first option
+                            target_column = st.selectbox(
+                                "Select the target column:",
+                                options=columns_with_placeholder,
+                                index=0,  # Default to the placeholder
+                                key=select_key
+                            )
+                            
+                            # Check if user has selected a valid column (not the placeholder)
+                            if target_column != "--Select a target column--":
+                                st.session_state['target_column'] = target_column
+                                st.session_state.target_column_selected = True
+                                
+                                # Only show insights when a target is selected
+                                if st.session_state.target_column_selected:
+                                    # Show progress container
+                                    insight_progress = st.empty()
+                                    insight_status = st.empty()
                                     
-                                    try:
-                                        # Update progress at 25%
-                                        insight_progress.progress(25)
-                                        insight_status.info('Loading and preparing data...')
+                                    with st.spinner('🔍 Generating comprehensive data insights...'):
+                                        # Initialize progress
+                                        insight_progress.progress(0)
+                                        insight_status.info('Starting insight generation...')
                                         
-                                        # Update progress at 50%
-                                        insight_progress.progress(50)
-                                        insight_status.info('Analyzing relationships and patterns...')
-                                        
-                                        # Update progress at 75%
-                                        insight_progress.progress(75)
-                                        insight_status.info('Generating visualizations...')
-                                        
-                                        # Pass the extracted engineered file path and selected target column
-                                        display_insight_generation_results(engineered_file_path, target_column)
-                                        
-                                        # Complete progress
-                                        insight_progress.progress(100)
-                                        insight_status.success('✨ Insights generated successfully!')
-                                        
-                                        # Clear progress indicators after completion
-                                        insight_progress.empty()
-                                        
-                                    except Exception as e:
-                                        insight_status.error(f"Error during insight generation: {str(e)}")
-                                        st.exception(e)
+                                        try:
+                                            # Update progress at 25%
+                                            insight_progress.progress(25)
+                                            insight_status.info('Loading and preparing data...')
+                                            
+                                            # Update progress at 50%
+                                            insight_progress.progress(50)
+                                            insight_status.info('Analyzing relationships and patterns...')
+                                            
+                                            # Update progress at 75%
+                                            insight_progress.progress(75)
+                                            insight_status.info('Generating visualizations...')
+                                            
+                                            # Pass the extracted engineered file path and selected target column
+                                            display_insight_generation_results(engineered_file_path, target_column)
+                                            
+                                            # Complete progress
+                                            insight_progress.progress(100)
+                                            insight_status.success('✨ Insights generated successfully!')
+                                            
+                                            # Clear progress indicators after completion
+                                            insight_progress.empty()
+                                            
+                                        except Exception as e:
+                                            insight_status.error(f"Error during insight generation: {str(e)}")
+                                            st.exception(e)
                             else:
                                 # Show a message prompting user to select a target column
                                 st.info("Please select a target column to generate insights")
+                                    
+                            st.markdown("""</div>""", unsafe_allow_html=True)
                                 
-                        st.markdown("""</div>""", unsafe_allow_html=True)
-                            
-                            
-                    else:
-                        st.warning("Task output not structured as expected. Displaying raw results:")
-                        try:
-                            raw_content = crew_output.raw.strip("`")
-                            raw_content = preprocess_for_json(raw_content)
-                            result = json.loads(raw_content)
-                            st.json(result)
-                        except Exception as parse_error:
-                            st.error(f"Error parsing raw output: {str(parse_error)}")
-                            st.write(crew_output.raw)
+                                
+                        else:
+                            st.warning("Task output not structured as expected. Displaying raw results:")
+                            try:
+                                raw_content = crew_output.raw.strip("`")
+                                raw_content = preprocess_for_json(raw_content)
+                                result = json.loads(raw_content)
+                                st.json(result)
+                            except Exception as parse_error:
+                                st.error(f"Error parsing raw output: {str(parse_error)}")
+                                st.write(crew_output.raw)
 
                 else:
                     st.error("Failed to save the uploaded file.")
@@ -486,33 +550,9 @@ def main():
                 <p class="description-text">
                 <ol>
                     <li><strong class="highlight-text">Upload your data</strong>: Click on the file upload button on the home page and select a CSV or Excel file from your computer.</li>
+                    <li><strong class="highlight-text">Click Analyze</strong>: After your file is uploaded, click the "Analyze Dataset" button to start the AI analysis process.</li>
                     <li><strong class="highlight-text">Processing</strong>: Our AI engine will automatically analyze your data, identifying patterns and preparing visualizations.</li>
-                    <li><strong class="highlight-text">Explore insights</strong>: Navigate through the generated sections to discover different perspectives on your data.</li>
-                    <li><strong class="highlight-text">Download results</strong>: Save any visualizations or insights for your presentations, reports, or further analysis.</li>
-                </ol>
-                </p>
-            """, unsafe_allow_html=True)
-        
-        with st.expander("Supported File Formats"):
-            st.markdown("""
-                <p class="description-text">
-                DEVA AI currently supports:
-                <ul>
-                    <li><strong class="highlight-text">CSV Files</strong> (.csv) - Comma-separated values</li>
-                    <li><strong class="highlight-text">Excel Files</strong> (.xlsx) - Microsoft Excel spreadsheets</li>
-                </ul>
-                
-                Our development roadmap includes support for JSON, SQL databases, and direct API connections in upcoming releases.
-                </p>
-            """, unsafe_allow_html=True)
-        
-        
-        with st.expander("How to Use DEVA AI"):
-            st.markdown("""
-                <p class="description-text">
-                <ol>
-                    <li><strong class="highlight-text">Upload your data</strong>: Click on the file upload button on the home page and select a CSV or Excel file from your computer.</li>
-                    <li><strong class="highlight-text">Processing</strong>: Our AI engine will automatically analyze your data, identifying patterns and preparing visualizations.</li>
+                    <li><strong class="highlight-text">Select Target Variable</strong>: Choose the column you want to focus on for deeper insights.</li>
                     <li><strong class="highlight-text">Explore insights</strong>: Navigate through the generated sections to discover different perspectives on your data.</li>
                     <li><strong class="highlight-text">Download results</strong>: Save any visualizations or insights for your presentations, reports, or further analysis.</li>
                 </ol>

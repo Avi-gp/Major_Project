@@ -15,52 +15,37 @@ def display_preprocessing_results(preprocessing_data):
         preprocessing_data: The task output for preprocessing task
     """
     try:
-        # Initialize session state for file download if not already done
-        if 'preprocessed_file_path' not in st.session_state:
-            st.session_state.preprocessed_file_path = None
-            st.session_state.preprocessed_file_name = None
-            st.session_state.preprocessed_file_type = None
-            st.session_state.preprocessed_file_content = None
-            st.session_state.preprocessing_completed = False
-        
         # Display preprocessing results with improved styling
         st.markdown('<h2 class="subheader">🔍 Data Preprocessing Results</h2>', unsafe_allow_html=True)
         
-        # Check if we've already processed the data
-        if not st.session_state.preprocessing_completed:
-            # Extract preprocessing data from raw output
-            raw_content = preprocessing_data.raw
+        # Extract preprocessing data from raw output
+        raw_content = preprocessing_data.raw
+        
+        # Try parsing as JSON first
+        result = parse_json_safely(raw_content)
+        
+        # If parsing didn't produce the expected fields, fall back to regex
+        expected_keys = ["original_shape", "final_shape", "original_missing_values", "missing_values_handled"]
+        if not result or not any(key in result for key in expected_keys):
+            result = extract_preprocessing_info(raw_content)
+        
+        # Get preprocessed file information
+        preprocessed_file_path = result.get("preprocessed_file_path", "")
+        preprocessed_file_content = None
+        preprocessed_file_name = None
+        preprocessed_file_type = None
+        
+        # Read file content if it exists
+        if preprocessed_file_path and os.path.exists(preprocessed_file_path):
+            file_extension = os.path.splitext(preprocessed_file_path)[1].lower()
+            file_type = "text/csv" if file_extension == ".csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            file_name = os.path.basename(preprocessed_file_path)
             
-            # Try parsing as JSON first
-            result = parse_json_safely(raw_content)
-            
-            # If parsing didn't produce the expected fields, fall back to regex
-            expected_keys = ["original_shape", "final_shape", "original_missing_values", "missing_values_handled"]
-            if not result or not any(key in result for key in expected_keys):
-                result = extract_preprocessing_info(raw_content)
-            
-            # Store processed file path and content in session state (only once when initially processed)
-            preprocessed_file_path = result.get("preprocessed_file_path", "")
-            if preprocessed_file_path and os.path.exists(preprocessed_file_path):
-                file_extension = os.path.splitext(preprocessed_file_path)[1].lower()
-                file_type = "text/csv" if file_extension == ".csv" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                file_name = os.path.basename(preprocessed_file_path)
+            with open(preprocessed_file_path, "rb") as file:
+                preprocessed_file_content = file.read()
                 
-                # Read file content once and store it in session state
-                with open(preprocessed_file_path, "rb") as file:
-                    file_content = file.read()
-                
-                st.session_state.preprocessed_file_path = preprocessed_file_path
-                st.session_state.preprocessed_file_name = file_name
-                st.session_state.preprocessed_file_type = file_type
-                st.session_state.preprocessed_file_content = file_content
-            
-            # Store the results in session state
-            st.session_state.preprocessing_result = result
-            st.session_state.preprocessing_completed = True
-        else:
-            # Use the stored results
-            result = st.session_state.preprocessing_result
+            preprocessed_file_name = file_name
+            preprocessed_file_type = file_type
         
         # Create cards for key metrics
         with st.container():
@@ -316,17 +301,13 @@ def display_preprocessing_results(preprocessing_data):
                 st.warning(f"Could not display preview data: {preview_error}")
                 st.write("Raw preview data:", preview_data)
 
-        # Handle download button for preprocessed file using session state
-        if st.session_state.preprocessed_file_content is not None:
-            # Use a callback to prevent re-execution
-            def get_download_data():
-                return st.session_state.preprocessed_file_content
-                
+        # Handle download button for preprocessed file
+        if preprocessed_file_content is not None:
             st.download_button(
                 label="📥 Download Preprocessed Data",
-                data=get_download_data(),
-                file_name=st.session_state.preprocessed_file_name,
-                mime=st.session_state.preprocessed_file_type,
+                data=preprocessed_file_content,
+                file_name=preprocessed_file_name,
+                mime=preprocessed_file_type,
                 key="download-preprocessed",
                 help="Download the cleaned and preprocessed dataset"
             )
