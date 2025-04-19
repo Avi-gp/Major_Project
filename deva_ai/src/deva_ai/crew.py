@@ -5,7 +5,6 @@ from streamlit import context
 from tools.file_handling_tool import FileHandlingTool
 from tools.data_preprocessing_tool import DataPreprocessingTool
 from tools.feature_engineering_tool import FeatureEngineeringTool
-from tools.insight_generation_tool import InsightGenerationTool
 from dotenv import load_dotenv
 import os
 import yaml

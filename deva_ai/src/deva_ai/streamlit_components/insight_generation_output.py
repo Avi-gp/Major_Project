@@ -12,6 +12,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import PIL
+from streamlit_components.AI_Insights import generate_ai_insights
+import re
 
 # Set the maximum image size limit to a higher value
 PIL.Image.MAX_IMAGE_PIXELS = None 
@@ -125,10 +127,10 @@ def display_insight_generation_results(file_path, target_column):
         st.markdown("<div style='padding: 10px 0px;'></div>", unsafe_allow_html=True)
 
         # Create tabs for different analyses
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-            "📊 Univariate", "🔄 Bivariate", "📋 Categorical",
-            "🔗 Correlation", "🎯 Feature Importance", 
-            "🎯 Target Analysis", "🤖 AI Insights"
+        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 Univariate", "🔄 Bivariate", "📋 Categorical",
+        "🔗 Correlation", "🎯 Feature Importance", 
+        "🎯 Target Analysis"
         ])
         
         # 1. Univariate Analysis Tab
@@ -959,97 +961,131 @@ def display_insight_generation_results(file_path, target_column):
             
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # 7. AI Insights Tab
-        with tab7:
-            st.markdown('<div>', unsafe_allow_html=True)
-            st.markdown("### AI-Powered Dataset Insights")
+        # AI-Insights Section    
+        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown("## 🤖 AI-Powered Insights")
+        st.markdown("<hr>", unsafe_allow_html=True)
+
+        # Generate AI insights using the new function
+        with st.spinner("Generating AI insights..."):
+            ai_insights = generate_ai_insights(
+                df, 
+                target_column, 
+                numerical_cols, 
+                categorical_cols, 
+                target_is_numeric, 
+                feature_num_cols
+            )
             
-            try:
-                # Extract basic statistics for context
-                num_rows = len(df)
-                num_cols = len(df.columns)
+            if ai_insights and not ai_insights.startswith("Error"):
+                # Split the insights into sections by headings
+                insight_sections = []
+                current_section = ""
+                current_title = "Key Insights"
                 
-                # Check for missing values
-                missing_values = df.isnull().sum()
-                columns_with_missing = missing_values[missing_values > 0]
-                missing_info = ""
-                if len(columns_with_missing) > 0:
-                    missing_info = f"Columns with missing values: {', '.join(columns_with_missing.index.tolist())}"
-                
-                # Get correlation with target if numeric
-                target_correlations = {}
-                if target_is_numeric and len(feature_num_cols) > 0:
-                    target_corr = df[feature_num_cols].corrwith(df[target_column]).abs().sort_values(ascending=False)
-                    top_correlated = target_corr.head(5)
-                    target_correlations = dict(zip(top_correlated.index, top_correlated.values))
-                
-                # Get basic stats for numeric columns
-                numeric_stats = df[numerical_cols].describe().transpose()
-                
-                # Prepare the dataset overview
-                dataset_overview = {
-                    "basic_info": {
-                        "rows": num_rows,
-                        "columns": num_cols,
-                        "numerical_columns": len(numerical_cols),
-                        "categorical_columns": len(categorical_cols),
-                        "target_column": target_column,
-                        "target_type": "numerical" if target_is_numeric else "categorical"
-                    },
-                    "missing_data": missing_info,
-                    "target_correlations": target_correlations,
-                }
-                
-                # Create the analysis prompt
-                system_prompt = """
-                You are a data science assistant specialized in providing insights about datasets. 
-                Your task is to analyze the dataset information provided and generate valuable insights.
-                Focus on patterns, relationships, and potential areas of interest within the data.
-                Highlight key findings, potential issues, and recommendations based on the data characteristics.
-                Structure your analysis in clear sections with markdown formatting, with actionable insights.
-                """
-                
-                analysis_prompt = f"""
-                Dataset Overview:
-                - Number of rows: {dataset_overview['basic_info']['rows']}
-                - Number of columns: {dataset_overview['basic_info']['columns']}
-                - Numerical columns: {dataset_overview['basic_info']['numerical_columns']}
-                - Categorical columns: {dataset_overview['basic_info']['categorical_columns']}
-                - Target column: {dataset_overview['basic_info']['target_column']}
-                - Target type: {dataset_overview['basic_info']['target_type']}
-                
-                Missing data information:
-                {dataset_overview['missing_data'] if dataset_overview['missing_data'] else "No missing values in the dataset."}
-                
-                Top correlated features with target:
-                {dataset_overview['target_correlations'] if dataset_overview['target_correlations'] else "Target is categorical or no strong correlations found."}
-                
-                Key statistical information:
-                {numeric_stats.to_string()}
-                
-                Based on the above information, provide insightful analysis of this dataset focusing on:
-                1. Key patterns and relationships
-                2. Potential issues or data quality concerns
-                3. Suggestions for further analysis or modeling
-                4. Feature importance and relationships with the target variable
-                5. Potential business insights that could be derived
-                """
-                
-                with st.spinner("Generating AI insights..."):
-                    # Call the helper function to get AI insights
-                    helper = helperFunction()
-                    ai_insights = helper.call_llm(system_prompt, analysis_prompt)
-                    
-                    if ai_insights:
-                        st.markdown(ai_insights)
+                for line in ai_insights.split('\n'):
+                    if line.startswith('###'):
+                        if current_section:
+                            insight_sections.append((current_title, current_section))
+                            current_section = ""
+                        current_title = line.replace('###', '').strip()
                     else:
-                        st.error("Unable to generate AI insights. Please try again later.")
-                        
-            except Exception as e:
-                st.error(f"Error generating AI insights: {str(e)}")
+                        current_section += line + '\n'
                 
-            st.markdown('</div>', unsafe_allow_html=True)
-              
+                # Add the last section
+                if current_section:
+                    insight_sections.append((current_title, current_section))
+                
+                # Display insights in formatted sections
+                for title, content in insight_sections:
+                    st.markdown(f"### {title}")
+                    st.markdown(content)
+                    # Add a subtle divider between sections
+                    st.markdown("<hr style='border: 0; height: 1px; background-color: #e0e0e0; margin: 20px 0;'>", unsafe_allow_html=True)
+                
+                def format_markdown_for_download(ai_insights, target_column):
+                    """
+                    Format the AI insights as a clean markdown file with improved table display
+                    
+                    Parameters:
+                    -----------
+                    ai_insights : str
+                        The AI-generated insights text
+                    target_column : str
+                        The name of the target variable
+                    
+                    Returns:
+                    --------
+                    str
+                        Properly formatted markdown content
+                    """
+                    # Start with the title and target info
+                    md_content = f"AI-Powered Insights for Dataset Analysis\n================================================\n\n**Target Variable: {target_column}**\n\n"
+                    
+                    # Clean up and standardize the insights
+                    cleaned_insights = ai_insights
+                    
+                    # Replace markdown headers with custom styled headers (no # visible)
+                    cleaned_insights = re.sub(r'^##\s+(.+)$', r'\1\n' + '=' * 40, cleaned_insights, flags=re.MULTILINE)
+                    cleaned_insights = re.sub(r'^###\s+(.+)$', r'\1\n' + '-' * 30, cleaned_insights, flags=re.MULTILINE)
+                    
+                    # Ensure bullet points use hyphens consistently
+                    cleaned_insights = re.sub(r'^•\s+(.+)$', r'- \1', cleaned_insights, flags=re.MULTILINE)
+                    
+                    # Improve table formatting - especially for the business value table
+                    def format_table_row(row_text):
+                        cells = row_text.split('|')
+                        return '| ' + ' | '.join(c.strip() for c in cells if c.strip()) + ' |'
+                    
+                    # Find table-like sections and format them better
+                    lines = cleaned_insights.split('\n')
+                    for i in range(len(lines)):
+                        if '|' in lines[i] and '---' in lines[i]:
+                            # This looks like a table header row, format it and surrounding rows
+                            header_idx = i
+                            # Format the header row
+                            lines[header_idx] = format_table_row(lines[header_idx])
+                            
+                            # Format divider row
+                            if header_idx + 1 < len(lines) and '|' in lines[header_idx + 1] and '---' in lines[header_idx + 1]:
+                                divider_cells = lines[header_idx + 1].split('|')
+                                formatted_divider = '|'
+                                for cell in divider_cells:
+                                    if cell.strip():
+                                        formatted_divider += ' ' + '-' * 10 + ' |'
+                                lines[header_idx + 1] = formatted_divider
+                            
+                            # Format data rows
+                            row_idx = header_idx + 2
+                            while row_idx < len(lines) and '|' in lines[row_idx]:
+                                lines[row_idx] = format_table_row(lines[row_idx])
+                                row_idx += 1
+                    
+                    cleaned_insights = '\n'.join(lines)
+                    
+                    # Add proper spacing between sections
+                    cleaned_insights = re.sub(r'(.+)\n(=+|-+)', r'\1\n\2\n\n', cleaned_insights)
+                    
+                    md_content += cleaned_insights
+                    
+                    return md_content
+                
+                # Process insights for better formatting
+                md_content = format_markdown_for_download(ai_insights, target_column)
+
+                # Download button with updated styling
+                st.download_button(
+                    label="📝 Download Insight Report",
+                    data=md_content,
+                    file_name=f"ai_insights_{target_column}.md",
+                    mime="text/markdown",
+                    help="Download the AI-generated insights as a markdown file."
+                )
+            else:
+                st.error("Unable to generate AI insights. Please try again later.")
+                if ai_insights and ai_insights.startswith("Error"):
+                    st.error(ai_insights)
+                                 
     except Exception as e:
         st.error(f"Error: {str(e)}")
 

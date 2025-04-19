@@ -147,28 +147,28 @@ def main():
 
             /* Download button enhancement */
             .stDownloadButton > button {
-                background-color: #4d8bf0 !important;
+                background-color: rgba(77, 139, 240, 0.8) !important; /* Semi-transparent blue */
                 color: white !important;
                 padding: 12px 24px !important;
                 font-weight: bold !important;
                 border-radius: 8px !important;
                 border: none !important;
                 display: flex !important;
-                align-items: center !important;
-                justify-content: center !important;
+                align-items:flex-start !important;
+                justify-content:center !important;
                 margin: 20px auto !important;
                 transition: all 0.3s !important;
             }
 
             .stDownloadButton > button:hover {
-                background-color: #3a78dd !important;
+                background-color: rgba(58, 120, 221, 0.9) !important; /* Slightly less transparent on hover */
                 box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
                 transform: translateY(-2px) !important;
             }
 
             /* Error container styling */
             .stException {
-                background-color: rgba(187, 51, 51, 0.1) !important;
+                background-color: rgba(187, 51, 51, 0.1) !important; /* Very transparent red */
                 border-radius: 8px !important;
                 padding: 15px !important;
                 border: 1px solid rgba(187, 51, 51, 0.3) !important;
@@ -291,7 +291,7 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        st.image("https://via.placeholder.com/150x150.png?text=DEVA+AI", width=150)
+        st.image("./logo1.png",width=190,output_format="PNG")
         st.markdown("### Navigation")
         if st.button("🏠 Home"):
             st.session_state.page = "Home"

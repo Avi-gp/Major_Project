@@ -1,5 +1,5 @@
 # insight_generation_tool.py
-from typing import Type, Optional
+'''from typing import Type, Optional
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
 import pandas as pd
@@ -567,4 +567,4 @@ class InsightGenerationTool(BaseTool):
             }
         
         return target_analysis
-    
+ '''
