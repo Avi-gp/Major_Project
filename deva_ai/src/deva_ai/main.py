@@ -1,3 +1,4 @@
+import sqlite_patch
 import json
 import pandas as pd
 import streamlit as st
