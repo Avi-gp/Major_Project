@@ -1,13 +1,7 @@
-import re
-import json
 import pandas as pd
 import streamlit as st
 import os
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-from utils import extract_value, parse_json_safely, extract_feature_engineering_info
-import plotly.graph_objects as go
+from utils import parse_json_safely, extract_feature_engineering_info
 
 def display_feature_engineering_results(feature_engineering_data):
     """

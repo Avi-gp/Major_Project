@@ -1,13 +1,10 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-import shap
 from helper import helperFunction
 import matplotlib.gridspec as gridspec
-from matplotlib.colors import LinearSegmentedColormap
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
