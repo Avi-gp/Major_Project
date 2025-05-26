@@ -7,7 +7,6 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from utils import extract_value, parse_json_safely, extract_feature_engineering_info
-import plotly.express as px
 import plotly.graph_objects as go
 
 def display_feature_engineering_results(feature_engineering_data):

@@ -8,7 +8,7 @@ numpy
 matplotlib
 seaborn
 scikit-learn
-
+plotly
 #Additional Dependencies for deployment
 pysqlite3-binary
 chromadb
