@@ -291,7 +291,7 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        st.image("images/logo1.png", width=190, output_format="PNG")
+        st.image("./images/logo1.png", width=190, output_format="PNG")
         st.markdown("### Navigation")
         if st.button("🏠 Home"):
             st.session_state.page = "Home"
