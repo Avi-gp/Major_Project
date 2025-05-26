@@ -291,7 +291,24 @@ def main():
 
     # Sidebar
     with st.sidebar:
-        st.image("./images/logo1.png", width=190, output_format="PNG")
+        st.markdown("""
+        <div style="text-align:center; background: transparent; border-radius: 12px; margin-bottom: 10px;">
+            <div style="display: inline-flex; align-items: center; gap: 10px;">
+                <svg width="24" height="24" viewBox="0 0 24 24" style="filter: drop-shadow(0 0 4px rgba(96, 165, 250, 0.4));">
+                    <polygon points="12,2 22,8 22,16 12,22 2,16 2,8" fill="none" stroke="#60A5FA" stroke-width="1"/>
+                    <circle cx="12" cy="12" r="6" fill="none" stroke="#60A5FA" stroke-width="1.5"/>
+                    <circle cx="12" cy="12" r="3" fill="#60A5FA"/>
+                    <circle cx="12" cy="12" r="1" fill="#1F2937"/>
+                </svg>
+                <span style="background: linear-gradient(135deg, #F8FAFC 0%, #E2E8F0 50%, #CBD5E1 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-size: 32px; font-weight: 700; font-family: 'Roboto', 'Arial', sans-serif; letter-spacing:1.5px;">DEVA AI</span>
+            </div>
+            <div style="margin-top: 5px;">
+                <span style="background: linear-gradient(90deg, #374151, #6B7280); padding: 3px 12px; border-radius: 15px; color: #E5E7EB; font-size: 11px; font-weight: 500; font-family: 'Poppins', sans-serif; letter-spacing: 1px; box-shadow: 0 2px 6px rgba(96, 165, 250, 0.2); border: 1px solid #4B5563;">✨ UNVEILING INSIGHTS ✨</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
         st.markdown("### Navigation")
         if st.button("🏠 Home"):
             st.session_state.page = "Home"
