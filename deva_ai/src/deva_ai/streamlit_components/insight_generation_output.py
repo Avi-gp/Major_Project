@@ -82,7 +82,8 @@ def display_insight_generation_results(file_path, target_column):
         # Separate numerical and categorical columns
         numerical_cols, categorical_cols = identify_feature_types(df)
        
-        st.markdown("## Column Type Classification")
+        st.markdown('<h3 class="highlight-text">Column Type Classification</h3>', unsafe_allow_html=True)
+        st.markdown('<div>', unsafe_allow_html=True)
         st.text("Columns are classified based on thier types and no of unique values.")
         col_info = pd.DataFrame({
             'Data Type': ['Numerical', 'Categorical'],
@@ -118,10 +119,11 @@ def display_insight_generation_results(file_path, target_column):
             feature_cat_cols = categorical_cols
             target_is_categorical = False
 
-        st.markdown("<div style='padding: 20px 0px;'></div>", unsafe_allow_html=True)
-        st.markdown("## 📈 Interactive Data Analysis")
+        st.markdown("<div style='padding: 8px 0px;'></div>", unsafe_allow_html=True)
+        st.markdown('<h3 class="highlight-text">📈 Interactive Data Analysis</h3>', unsafe_allow_html=True)
+        st.markdown('<div>', unsafe_allow_html=True)
         st.markdown("Explore your dataset through different analytical perspectives using the tabs below.")
-        st.markdown("<div style='padding: 10px 0px;'></div>", unsafe_allow_html=True)
+
 
         # Create tabs for different analyses
         tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -132,9 +134,9 @@ def display_insight_generation_results(file_path, target_column):
         
         # 1. Univariate Analysis Tab
         with tab1:
-            st.markdown('<div', unsafe_allow_html=True)
-            st.markdown("### Distribution Of Numerical Features")
-            
+            st.markdown('<div>', unsafe_allow_html=True)
+            st.markdown('<h4 class="highlight-text">Distribution Of Numerical Features</h4>', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
             # Show top 15 numerical distributions
             if len(feature_num_cols) > 0:
                 # Limit to first 15 numerical columns if there are too many
@@ -165,8 +167,8 @@ def display_insight_generation_results(file_path, target_column):
             
             # Show top 15 categorical distributions
             if len(feature_cat_cols) > 0:
-                st.markdown("### Distribution of Categorical Features")
-                
+                st.markdown('<h4 class="highlight-text">Distribution of Categorical Features</h4>', unsafe_allow_html=True)
+                st.markdown('<div>', unsafe_allow_html=True)
                 # Limit to first 15 categorical columns
                 display_cat_cols = feature_cat_cols[:15]
                 
@@ -208,8 +210,8 @@ def display_insight_generation_results(file_path, target_column):
 
             # Box plots for numerical features
             if len(feature_num_cols) > 0:
-                st.markdown("### Box Plots of Numerical Features")
-                
+                st.markdown('<h4 class="highlight-text">Box Plots of Numerical Features</h4>', unsafe_allow_html=True)
+                st.markdown('<div>', unsafe_allow_html=True)
                 # Limit to first 15 numerical columns
                 display_num_cols = feature_num_cols[:15]
                 
@@ -233,8 +235,8 @@ def display_insight_generation_results(file_path, target_column):
 
             # Box plots for categorical columns with user selection (limit of 5 categorical columns)
             if len(feature_cat_cols) > 0:
-                st.markdown("### Box Plots with Categorical Features")
-                
+                st.markdown('<h4 class="highlight-text">Box Plots with Categorical Features</h4>', unsafe_allow_html=True)
+                st.markdown('<div>', unsafe_allow_html=True)
                 # Filter categorical columns with reasonable number of categories to avoid overcrowding
                 filtered_cat_cols = [col for col in feature_cat_cols if df[col].nunique() <= 10]
                 
@@ -310,8 +312,8 @@ def display_insight_generation_results(file_path, target_column):
             datetime_columns = [col for col in df.columns if pd.api.types.is_datetime64_dtype(df[col]) or pd.api.types.is_datetime64_any_dtype(df[col])]
             
             if datetime_columns and len(feature_num_cols) > 0:
-                st.markdown("### Time Series Analysis")
-                
+                st.markdown('<h4 class="highlight-text">Time Series Analysis</h4>', unsafe_allow_html=True)
+                st.markdown('<div>', unsafe_allow_html=True)
                 # Let user select time column and numeric columns for analysis
                 time_col = st.selectbox("Select time column for analysis:", datetime_columns)
                 
@@ -391,8 +393,8 @@ def display_insight_generation_results(file_path, target_column):
             
             # Modified approach with user selection
             if len(feature_num_cols) >= 2:
-                st.markdown("### Relationships Between Numerical Features")
-                
+                st.markdown('<h4 class="highlight-text">Relationships Between Numerical Features</h4>', unsafe_allow_html=True)
+                st.markdown('<div>', unsafe_allow_html=True)
                 # Select default features based on correlation with target
                 if target_is_numeric:
                     correlations = abs(df[feature_num_cols].corrwith(df[target_column]))
@@ -453,7 +455,7 @@ def display_insight_generation_results(file_path, target_column):
         with tab3:
             st.markdown('<div>', unsafe_allow_html=True)
             if len(feature_cat_cols) > 0:
-                st.markdown("### Categorical Analysis")
+                
                 
                 # Display categorical variables summary
                 categorical_summary = pd.DataFrame({
@@ -468,8 +470,8 @@ def display_insight_generation_results(file_path, target_column):
                 display_cat_cols = feature_cat_cols[:min(15, len(feature_cat_cols))]
                 
                 if display_cat_cols:
-                    st.markdown("### Categorical Distributions")
-                    
+                    st.markdown('<h4 class="highlight-text">Categorical Analysis</h4>', unsafe_allow_html=True)
+                    st.markdown('<div>', unsafe_allow_html=True)
                     n_cols = 3
                     
                     for i in range(0, len(display_cat_cols), n_cols):
@@ -491,8 +493,8 @@ def display_insight_generation_results(file_path, target_column):
                                     st.plotly_chart(fig, use_container_width=True)
                     
                     # Categorical relationships - modified to allow selection of both primary and secondary columns
-                    st.markdown("### Categorical Relationships")
-
+                    st.markdown('<h4 class="highlight-text">Categorical Relationships</h4>', unsafe_allow_html=True)
+                    st.markdown('<div>', unsafe_allow_html=True)
                     # Filter columns with 15 or fewer unique values
                     cat_cols_for_relationship = [col for col in display_cat_cols if df[col].nunique() <= 15]
 
@@ -598,7 +600,8 @@ def display_insight_generation_results(file_path, target_column):
                             st.plotly_chart(fig, use_container_width=True)
                             
                             # Add option to view multiple relationships
-                            st.markdown("### Additional Relationships")
+                            st.markdown('<h4 class="highlight-text">Additional Relationships</h4>', unsafe_allow_html=True)
+                            st.markdown('<div>', unsafe_allow_html=True)
                             show_more = st.checkbox("Show relationships with other categorical variables")
                             
                             if show_more:
@@ -674,8 +677,8 @@ def display_insight_generation_results(file_path, target_column):
         with tab4:
             st.markdown('<div>', unsafe_allow_html=True)
             if len(numerical_cols) > 1:
-                st.markdown("### Correlation Matrix")
-                
+                st.markdown('<h4 class="highlight-text">Correlation Matrix</h4>', unsafe_allow_html=True)
+                st.markdown('<div>', unsafe_allow_html=True)
                 # Calculate correlation for numerical columns
                 corr = df[numerical_cols].corr()
                 
@@ -717,7 +720,7 @@ def display_insight_generation_results(file_path, target_column):
                 st.plotly_chart(fig)
                 
                 # Add correlation strength analysis
-                st.markdown("### Strong Correlations Analysis")
+                st.markdown('<h4 class="highlight-text">Strong Correlations Analysis</h4>', unsafe_allow_html=True)
                 
                 # Get strong correlations (absolute value > 0.5)
                 strong_corr = []
@@ -750,8 +753,9 @@ def display_insight_generation_results(file_path, target_column):
         # 5. Feature Importance Analysis Tab
         with tab5:
             st.markdown('<div>', unsafe_allow_html=True)
-            st.markdown("### Feature Importance Analysis")
-            
+            st.markdown('<h4 class="highlight-text">Feature Importance Analysis</h4>', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
+
             try:
                 # Prepare features and target
                 X = df.drop(columns=[target_column])
@@ -815,7 +819,7 @@ def display_insight_generation_results(file_path, target_column):
 
                 # Add feature importance explanation
                 st.markdown("""
-                ### Understanding Feature Importance
+                st.markdown('<h4>Understanding Feature Importance</h4>', unsafe_allow_html=True)
                 - **What it shows:** The chart above displays the relative importance of each feature in predicting the target variable.
                 - **How to interpret:** Larger values indicate features that have a stronger influence on the prediction.
                 - **Note:** Feature importance doesn't indicate the direction of impact (positive or negative), only magnitude.
@@ -829,8 +833,8 @@ def display_insight_generation_results(file_path, target_column):
         # 6. Target-Based Analysis Tab
         with tab6:
             st.markdown('<div>', unsafe_allow_html=True)
-            st.markdown(f"### Analysis of Target Variable: {target_column}")
-            
+            st.markdown(f'<h4 class="highlight-text">Analysis of Target Variable: {target_column}</h4>', unsafe_allow_html=True)
+            st.markdown('<div>', unsafe_allow_html=True)
             if target_is_numeric:
                 # Distribution of numeric target
                 fig = plt.figure(figsize=(18, 10))
@@ -865,8 +869,8 @@ def display_insight_generation_results(file_path, target_column):
                 plt.close()
                 
                 # Relationship with key predictors
-                st.markdown(f"### {target_column} Relationship with Key Predictors")
-                
+                st.markdown(f'<h4 class="highlight-text">{target_column} Relationship with Key Predictors</h4>', unsafe_allow_html=True)
+                st.markdown('<div>', unsafe_allow_html=True)
                 # Get top numerical predictors based on correlation
                 if len(feature_num_cols) > 0:
                     target_corr = df[feature_num_cols].corrwith(df[target_column]).abs().sort_values(ascending=False)
@@ -930,8 +934,8 @@ def display_insight_generation_results(file_path, target_column):
                 
                 # Create mosaic plots for categorical features
                 if len(feature_cat_cols) > 0:
-                    st.markdown(f"### {target_column} Distribution Across Categories")
-                    
+                    st.markdown(f'<h4 class="highlight-text">{target_column} Distribution Across Categories</h4>', unsafe_allow_html=True)
+                    st.markdown('<div>', unsafe_allow_html=True)
                     # Select top categorical columns
                     top_cat_cols = [col for col in feature_cat_cols if df[col].nunique() < 10][:3]
                     
@@ -960,8 +964,8 @@ def display_insight_generation_results(file_path, target_column):
 
         # AI-Insights Section    
         st.markdown("<hr>", unsafe_allow_html=True)
-        st.markdown("## 🤖 AI-Powered Insights")
-        st.markdown("<hr>", unsafe_allow_html=True)
+        st.markdown('<h2 class="subheader">🤖 AI-Powered Insights</h2>', unsafe_allow_html=True)
+        st.markdown('<div>', unsafe_allow_html=True)
 
         # Generate AI insights using the new function
         with st.spinner("Generating AI insights..."):

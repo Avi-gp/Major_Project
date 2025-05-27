@@ -111,7 +111,7 @@ def display_feature_engineering_results(feature_engineering_data):
 
         # Engineered Data Preview
         if "engineered_preview" in result and result["engineered_preview"]:
-            st.markdown("### Engineered Data Preview")
+            st.markdown('<h3 class="highlight-text">Engineered Data Preview</h3>', unsafe_allow_html=True)
             preview_df = pd.DataFrame(result["engineered_preview"])
             st.dataframe(preview_df, use_container_width=True)
             
