@@ -12,3 +12,4 @@ plotly
 #Additional Dependencies for deployment
 pysqlite3-binary
 chromadb
+litellm
