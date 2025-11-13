@@ -389,7 +389,7 @@ def display_insight_generation_results(file_path, target_column):
                         fig.update_yaxes(title_text=col, row=i+1, col=1, 
                                         showgrid=True, gridwidth=1, gridcolor='rgba(211, 211, 211, 0.5)')
                     
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width='stretch')
             
             # Modified approach with user selection
             if len(feature_num_cols) >= 2:
@@ -490,7 +490,7 @@ def display_insight_generation_results(file_path, target_column):
                                         title=f'Distribution of {cat_col}'
                                     )
                                     fig.update_layout(height=350, margin=dict(t=50, b=20, l=20, r=20))
-                                    st.plotly_chart(fig, use_container_width=True)
+                                    st.plotly_chart(fig, width='stretch')
                     
                     # Categorical relationships - modified to allow selection of both primary and secondary columns
                     st.markdown('<h4 class="highlight-text">Categorical Relationships</h4>', unsafe_allow_html=True)
@@ -561,7 +561,7 @@ def display_insight_generation_results(file_path, target_column):
                                 legend_title=selected_secondary_col
                             )
                             
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, width='stretch')
                             
                             # Also add a heatmap view of the relationship
                             st.subheader(f"Heatmap: {selected_primary_col} vs {selected_secondary_col}")
@@ -597,7 +597,7 @@ def display_insight_generation_results(file_path, target_column):
                                     )
                             fig.update_layout(annotations=annotations)
                             
-                            st.plotly_chart(fig, use_container_width=True)
+                            st.plotly_chart(fig, width='stretch')
                             
                             # Add option to view multiple relationships
                             st.markdown('<h4 class="highlight-text">Additional Relationships</h4>', unsafe_allow_html=True)
@@ -637,7 +637,7 @@ def display_insight_generation_results(file_path, target_column):
                                         legend_title=secondary_col
                                     )
                                     
-                                    st.plotly_chart(fig, use_container_width=True)
+                                    st.plotly_chart(fig, width='stretch')
                                     
                                     # Add heatmap
                                     count_contingency = pd.crosstab(
@@ -669,7 +669,7 @@ def display_insight_generation_results(file_path, target_column):
                                             )
                                     fig.update_layout(annotations=annotations)
                                     
-                                    st.plotly_chart(fig, use_container_width=True)
+                                    st.plotly_chart(fig, width='stretch')
                     else:
                         st.info("Need at least 2 categorical columns with 15 or fewer unique values to analyze relationships.")
 
@@ -815,7 +815,7 @@ def display_insight_generation_results(file_path, target_column):
                     textposition='outside'
                 )
 
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
 
                 # Add feature importance explanation
                 st.markdown("""

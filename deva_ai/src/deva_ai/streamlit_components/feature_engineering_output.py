@@ -83,7 +83,7 @@ def display_feature_engineering_results(feature_engineering_data):
         # Create and display the dataframe
         if feature_data:
             feature_df = pd.DataFrame(feature_data, index=["Count", "Features"]).transpose()
-            st.dataframe(feature_df, use_container_width=True)
+            st.dataframe(feature_df, width='stretch')
 
         # Engineering Methods Applied
         st.markdown('<h3 class="highlight-text">Engineering Methods Applied</h3>', unsafe_allow_html=True)
@@ -95,7 +95,7 @@ def display_feature_engineering_results(feature_engineering_data):
                     {"Feature": k, "Method": v} 
                     for k, v in result["scaling_methods_applied"].items()
                 ])
-                st.dataframe(scaling_df, use_container_width=True)
+                st.dataframe(scaling_df, width='stretch')
             else:
                 st.info("No scaling methods were applied")
                 
@@ -105,7 +105,7 @@ def display_feature_engineering_results(feature_engineering_data):
                     {"Feature": k, "Method": v} 
                     for k, v in result["encoding_methods_applied"].items()
                 ])
-                st.dataframe(encoding_df, use_container_width=True)
+                st.dataframe(encoding_df, width='stretch')
             else:
                 st.info("No encoding methods were applied")
 
@@ -113,7 +113,7 @@ def display_feature_engineering_results(feature_engineering_data):
         if "engineered_preview" in result and result["engineered_preview"]:
             st.markdown('<h3 class="highlight-text">Engineered Data Preview</h3>', unsafe_allow_html=True)
             preview_df = pd.DataFrame(result["engineered_preview"])
-            st.dataframe(preview_df, use_container_width=True)
+            st.dataframe(preview_df, width='stretch')
             
         # Download Button
         if "engineered_file_path" in result and os.path.exists(result["engineered_file_path"]):

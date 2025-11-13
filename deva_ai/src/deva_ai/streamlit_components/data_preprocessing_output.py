@@ -168,7 +168,7 @@ def display_preprocessing_results(preprocessing_data):
                 
                 # Display as dataframe if we have data
                 if df_data:
-                    st.dataframe(pd.DataFrame(df_data), use_container_width=True)
+                    st.dataframe(pd.DataFrame(df_data), width='stretch')
                 else:
                     # Fallback to string representation
                     st.write(", ".join(str(item) for item in data) if isinstance(data, list) else str(data))
@@ -190,7 +190,7 @@ def display_preprocessing_results(preprocessing_data):
             
             if conversion_data:
                 conversion_df = pd.DataFrame(conversion_data)
-                st.dataframe(conversion_df, use_container_width=True)
+                st.dataframe(conversion_df, width='stretch')
             else:
                 st.write("No type conversions detected.")
 
@@ -220,7 +220,7 @@ def display_preprocessing_results(preprocessing_data):
             
             if conversion_data:
                 conversion_df = pd.DataFrame(conversion_data)
-                st.dataframe(conversion_df, use_container_width=True)
+                st.dataframe(conversion_df, width='stretch')
             else:
                 st.write("No type conversions detected.")
         
@@ -260,7 +260,7 @@ def display_preprocessing_results(preprocessing_data):
                 
                 # Display styled dataframe - updated to use map instead of applymap
                 st.dataframe(dtype_df.style.map(highlight_datetime, subset=['Data Type']), 
-                           use_container_width=True)
+                           width='stretch')
             else:
                 st.write("Data type information not available in expected format.")
         
@@ -294,7 +294,7 @@ def display_preprocessing_results(preprocessing_data):
                     # If preview is not a list, create a simple dataframe
                     preprocessed_preview = pd.DataFrame({"Preview": [str(preview_data)]})
                 
-                st.dataframe(preprocessed_preview, use_container_width=True)
+                st.dataframe(preprocessed_preview, width='stretch')
                 
             except Exception as preview_error:
                 st.warning(f"Could not display preview data: {preview_error}")

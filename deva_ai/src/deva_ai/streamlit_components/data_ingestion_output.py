@@ -94,7 +94,7 @@ def display_data_ingestion_results(crew_output):
                     # If preview is not a list, create a simple dataframe
                     preview_df = pd.DataFrame({"Preview": [str(preview_data)]})
                 
-                st.dataframe(preview_df, use_container_width=True)
+                st.dataframe(preview_df, width='stretch')
             
             # Column Information
             if "dtypes" in result and result["dtypes"]:
@@ -118,7 +118,7 @@ def display_data_ingestion_results(crew_output):
                                 col_info.append({"Column": parts[0].strip(), "Type": parts[1].strip()})
                 
                 if col_info:
-                    st.dataframe(pd.DataFrame(col_info), use_container_width=True)
+                    st.dataframe(pd.DataFrame(col_info), width='stretch')
                 else:
                     st.write("Column type information not available in expected format.")
                 
