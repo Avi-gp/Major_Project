@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+warnings.filterwarnings('ignore', category=DeprecationWarning, module='pydantic')
 import sqlite_patch
 import json
 import pandas as pd
