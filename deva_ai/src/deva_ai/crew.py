@@ -16,7 +16,7 @@ api_key = os.getenv('NVIDIA_NIM_API_KEY_1')
 LLM_model = LLM(
     model=llm_model_name,
     api_key=api_key,
-    temperature=0.5,
+    temperature=0.6,
 )
 
 # Initialize custom tools

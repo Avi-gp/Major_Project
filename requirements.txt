@@ -13,3 +13,4 @@ plotly
 pysqlite3-binary
 chromadb
 litellm
+litellm[all]
