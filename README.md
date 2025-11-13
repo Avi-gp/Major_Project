@@ -34,3 +34,6 @@ DEVA AI uses custom tools for:
 ✅ Insights into what affects your outcomes (like what factors influence sales or customer churn)
 ✅ Feature importance using machine learning models (Random Forest)
 
+# Screenshot
+![alt text](image.png)
+
